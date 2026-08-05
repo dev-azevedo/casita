@@ -60,18 +60,25 @@ onBeforeUnmount(() => {
     aria-modal="true"
     aria-label="Boas-vindas ao Casita"
     class="fixed inset-0 z-[90] overflow-y-auto bg-surface-0 outline-none"
+    style="
+      background-image:
+        radial-gradient(110% 70% at 10% 0%, var(--accent-soft) 0%, transparent 60%),
+        radial-gradient(90% 60% at 95% 100%, var(--accent-soft) 0%, transparent 55%);
+    "
     @touchstart.passive="aoTocar"
     @touchend.passive="aoSoltar"
   >
-    <div
-      class="absolute inset-0 pointer-events-none"
-      style="
-        background:
-          radial-gradient(110% 70% at 10% 0%, var(--accent-soft) 0%, transparent 60%),
-          radial-gradient(90% 60% at 95% 100%, var(--accent-soft) 0%, transparent 55%);
-        transition: background 400ms var(--ease-quart);
-      "
-    />
+    <!--
+      O gradiente é background DESTE elemento, não uma camada `absolute` dentro dele.
+      Numa camada absoluta o bloco de referência é a caixa do elemento `fixed`, que
+      tem altura de viewport: ao rolar, o conteúdo passava e o gradiente ficava preso
+      no primeiro écran. Como background de um contêiner de rolagem, ele fica ancorado
+      na caixa e cobre a tela em qualquer posição do scroll.
+
+      Sem `transition` aqui de propósito: background-image com gradiente não é
+      interpolável, então a transição que existia antes nunca rodou. A cor troca na
+      hora — que é o que se quer num seletor de cor mesmo.
+    -->
     <div
       class="relative mx-auto flex min-h-[100svh] max-w-2xl flex-col px-6 py-8"
       style="

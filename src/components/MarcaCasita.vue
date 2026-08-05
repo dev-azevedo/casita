@@ -10,7 +10,7 @@ defineProps({
     :class="tamanho === 'grande' ? 'text-3xl' : 'text-xl'"
     style="font-variation-settings: 'SOFT' 80, 'WONK' 1, 'opsz' 100"
   >
-    <span class="font-semibold tracking-tight text-ink">casita</span>
+    <span class="font-semibold tracking-tight text-ink">Casita</span>
     <span
       class="h-1.5 w-1.5 translate-y-[-0.15em] rounded-full bg-accent"
       aria-hidden="true"
