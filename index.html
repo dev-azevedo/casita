@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="A lista da nossa casa nova." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌇</text></svg>" />
+    <title>Casita</title>
+    <script>
+      // Roda antes da primeira pintura: sem isso, quem usa tema escuro ve um flash
+      // branco a cada carregamento.
+      // Le 'casita:hc' — o par (hue, chroma) que useTheme.js ja deixou resolvido —
+      // para nao precisar duplicar aqui a tabela de presets de src/lib/theme.js.
+      (function () {
+        try {
+          var tema = localStorage.getItem('casita:tema') || 'sistema'
+          var hc = (localStorage.getItem('casita:hc') || '140 0.062').split(' ')
+          var escuro =
+            tema === 'escuro' ||
+            (tema === 'sistema' && matchMedia('(prefers-color-scheme: dark)').matches)
+
+          var r = document.documentElement
+          r.dataset.theme = escuro ? 'escuro' : 'claro'
+          r.style.setProperty('--h', hc[0])
+          r.style.setProperty('--c', hc[1])
+
+          // Barra do navegador no celular acompanha o fundo do app.
+          var m = document.createElement('meta')
+          m.name = 'theme-color'
+          m.content = escuro
+            ? 'oklch(23% 0.014 ' + hc[0] + ')'
+            : 'oklch(98.5% 0.008 ' + hc[0] + ')'
+          document.head.appendChild(m)
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

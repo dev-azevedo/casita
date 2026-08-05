@@ -1,0 +1,280 @@
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/instrument-sans/wght.css';
+@import 'tailwindcss';
+
+/* Tailwind v4 nao tem dark por atributo por padrao. O <html> carrega data-theme. */
+@custom-variant dark (&:where([data-theme='escuro'], [data-theme='escuro'] *));
+
+/* ---------------------------------------------------------------------------
+   COR
+   --h e --c sao gravados no <html> por src/lib/theme.js (e pelo script inline do
+   index.html, antes da primeira pintura). Toda a paleta deriva desse par: trocar a
+   cor da casa retinge fundos, bordas e texto de leve, nao so os botoes.
+   Sem #000/#fff puros em lugar nenhum.
+--------------------------------------------------------------------------- */
+:root {
+  --h: 140;
+  --c: 0.06;
+
+  --surface-0: oklch(98.5% 0.008 var(--h));
+  --surface-1: oklch(96.4% 0.012 var(--h));
+  --surface-2: oklch(93.2% 0.016 var(--h));
+  --line-soft: oklch(92.5% 0.014 var(--h)); /* divisor, decorativo */
+  --line: oklch(88% 0.018 var(--h)); /* borda de card */
+  --line-strong: oklch(60% 0.022 var(--h)); /* campo de formulario: precisa de 3:1 */
+
+  --ink: oklch(26% 0.022 var(--h));
+  --ink-soft: oklch(47% 0.02 var(--h));
+  --ink-faint: oklch(51% 0.02 var(--h));
+
+  /* Os multiplicadores baixos em accent-ink/accent-soft nao sao economia de
+     saturacao: sao o que deixa --c subir. Em lightness extrema (40%, 94%) o sRGB
+     nao comporta chroma alto, e segurar o --c cheio nelas travava a paleta
+     inteira em pastel. Elas precisam ser escura/clara, nao saturadas. */
+  --accent: oklch(52% var(--c) var(--h));
+  --accent-hover: oklch(46% calc(var(--c) * 0.95) var(--h));
+  --accent-soft: oklch(94% calc(var(--c) * 0.16) var(--h));
+  --accent-ink: oklch(40% calc(var(--c) * 0.5) var(--h));
+  --on-accent: oklch(98% 0.012 var(--h));
+
+  --danger: oklch(52% 0.16 27);
+  --danger-soft: oklch(94% 0.04 27);
+
+  /* Vermelho / amarelo / azul. Separados por matiz E por clareza: daltonismo
+     apaga a diferenca de matiz, nao a de brilho. Ainda assim, a cor nunca e o
+     unico sinal — a marca tambem muda de forma (ver MarcaPrioridade.vue). */
+  --p-essencial: oklch(46% 0.19 22);
+  --p-importante: oklch(60% 0.14 88);
+  --p-desejavel: oklch(55% 0.07 228);
+
+  --scrim: oklch(20% 0.03 var(--h) / 0.62);
+
+  /* Profundidade: no claro, sombra discreta. Se da pra ver bem, ta forte demais. */
+  --elev-1: 0 1px 2px oklch(30% 0.02 var(--h) / 0.05);
+  --elev-2: 0 4px 16px oklch(30% 0.02 var(--h) / 0.08);
+  --elev-3: 0 12px 40px oklch(30% 0.02 var(--h) / 0.12);
+}
+
+/* Escuro nao e claro invertido: profundidade vem de superficie mais clara (sem
+   sombra) e o accent perde chroma para nao vibrar. */
+[data-theme='escuro'] {
+  /* Carvao, nao breu: preto puro cansa a vista e nao existe na natureza. */
+  --surface-0: oklch(23% 0.014 var(--h));
+  --surface-1: oklch(27% 0.016 var(--h));
+  --surface-2: oklch(32% 0.019 var(--h));
+  --line-soft: oklch(31% 0.018 var(--h));
+  --line: oklch(38% 0.02 var(--h));
+  --line-strong: oklch(58% 0.022 var(--h));
+
+  --ink: oklch(95% 0.012 var(--h));
+  --ink-soft: oklch(79% 0.015 var(--h));
+  --ink-faint: oklch(70% 0.015 var(--h));
+
+  --accent: oklch(74% calc(var(--c) * 0.85) var(--h));
+  --accent-hover: oklch(80% calc(var(--c) * 0.75) var(--h));
+  --accent-soft: oklch(36% calc(var(--c) * 0.4) var(--h));
+  --accent-ink: oklch(85% calc(var(--c) * 0.35) var(--h));
+  --on-accent: oklch(22% 0.025 var(--h));
+
+  --danger: oklch(75% 0.14 27);
+  --danger-soft: oklch(34% 0.06 27);
+
+  --p-essencial: oklch(64% 0.17 22);
+  --p-importante: oklch(86% 0.15 88);
+  --p-desejavel: oklch(74% 0.08 228);
+
+  --scrim: oklch(14% 0.02 var(--h) / 0.68);
+
+  --elev-1: none;
+  --elev-2: none;
+  --elev-3: 0 16px 48px oklch(8% 0.02 var(--h) / 0.5);
+}
+
+/* ---------------------------------------------------------------------------
+   TOKENS EXPOSTOS AO TAILWIND
+   `inline` faz o utilitario emitir var(--surface-0) direto, entao a troca de tema
+   cascateia sem regenerar classe.
+--------------------------------------------------------------------------- */
+@theme inline {
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-on-accent: var(--on-accent);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --text-hero: clamp(2.75rem, 11vw, 6.5rem);
+  --text-2xl: clamp(1.9rem, 4.5vw, 3rem);
+  --text-xl: clamp(1.4rem, 2.2vw, 1.9rem);
+  --text-lg: clamp(1.1rem, 1vw + 0.9rem, 1.3rem);
+
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+
+  --ease-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-quart: cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   BASE
+--------------------------------------------------------------------------- */
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  color-scheme: light;
+}
+
+[data-theme='escuro'] {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--surface-0);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Texto claro sobre fundo escuro pesa menos: precisa de mais ar. */
+[data-theme='escuro'] body {
+  line-height: 1.62;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1, 'opsz' 100;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+}
+
+/* Dinheiro e contagem nao podem dancar quando o valor muda. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* iOS da zoom ao focar input com fonte < 16px */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   MOVIMENTO
+   So transform e opacity. Stagger via --i, com teto aplicado no componente.
+--------------------------------------------------------------------------- */
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes flutuar {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(2deg);
+  }
+}
+
+@keyframes descer-dica {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(7px);
+    opacity: 1;
+  }
+}
+
+.surgir {
+  animation: surgir 620ms var(--ease-expo) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+.flutuar {
+  animation: flutuar 5.5s ease-in-out infinite;
+}
+
+/* Vestibular: tira deslocamento, mantem o crossfade e o que e funcional. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .surgir {
+    animation: aparecer 240ms var(--ease-quart) backwards;
+  }
+
+  .flutuar {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Faixa de fotos e filtros: some a barra sem perder o scroll. */
+.sem-barra {
+  scrollbar-width: none;
+}
+.sem-barra::-webkit-scrollbar {
+  display: none;
+}

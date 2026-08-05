@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+.env.*.local
+*.local
+.DS_Store
+.vite
+npm-debug.log*
+yarn-error.log*
+
+# Fotos pessoais — não versionar
+public/fotos/*
+!public/fotos/.gitkeep
