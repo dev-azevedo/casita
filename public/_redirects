@@ -1,0 +1,22 @@
+# Fallback de SPA no Netlify.
+#
+# O app usa createWebHistory, entao /presentes e um caminho de verdade, nao um
+# #hash. Navegar pelo RouterLink funciona porque quem troca a tela e o JS ja
+# carregado — nenhuma requisicao sai. Mas F5 nessa rota, ou colar a URL numa aba
+# nova, faz o navegador pedir /presentes AO SERVIDOR, e no dist so existem
+# index.html, assets/ e fotos/. Sem esta regra, o Netlify responde 404 antes de
+# qualquer JavaScript rodar — e /presentes e justamente o link que vai pro
+# WhatsApp da familia.
+#
+# 200, nao 301: e reescrita, nao redirecionamento. O Netlify entrega o conteudo
+# do index.html mantendo /presentes na barra de enderecos. Com 301 o navegador
+# iria para / e o convidado perderia a pagina que abriu.
+#
+# Nao engole os assets: o Netlify so aplica esta regra depois de tentar casar um
+# arquivo estatico real, entao /assets/*.js e /fotos/*.JPEG continuam sendo
+# servidos normalmente.
+#
+# Este arquivo mora em public/ para o Vite copia-lo para a raiz do dist. Assim a
+# regra viaja dentro do build e vale tanto pra deploy conectado ao Git quanto
+# pra quem arrasta a pasta dist na interface do Netlify.
+/*    /index.html   200

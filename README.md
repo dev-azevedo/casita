@@ -480,9 +480,31 @@ Build estático — qualquer host serve. Vercel, Netlify, Cloudflare Pages:
 - Output: `dist`
 - Variáveis de ambiente: `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-Como o app usa `createWebHistory`, o host precisa fazer fallback de todas as rotas
-para `index.html` (Vercel e Netlify fazem isso sozinhos para SPAs; em outros, é o
-`try_files`/rewrite equivalente).
+### Fallback de rotas — obrigatório
+
+Como o app usa `createWebHistory`, `/presentes` é um caminho de verdade, não um `#hash`.
+Navegar pelo `<RouterLink>` funciona sem tocar no servidor, mas **F5 nessa rota, ou abrir a
+URL direto, faz o navegador pedir `/presentes` ao host** — e no `dist` só existem
+`index.html`, `assets/` e `fotos/`. Sem fallback, dá 404 antes de qualquer JavaScript
+rodar. Isso quebra justamente o caminho principal: o convidado abre o link do WhatsApp
+direto em `/presentes`, nunca pela raiz.
+
+**Netlify não faz isso sozinho.** A regra vive em `public/_redirects`:
+
+```
+/*    /index.html   200
+```
+
+Fica em `public/` para o Vite copiá-la para a raiz do `dist` — assim ela viaja dentro do
+build e vale tanto para deploy conectado ao Git quanto para quem arrasta a pasta `dist` na
+interface. `200` é reescrita, não redirecionamento: a URL continua `/presentes` na barra.
+
+Em outros hosts é o equivalente: rewrite na Vercel, `try_files` no nginx. Cloudflare Pages
+lê o mesmo `_redirects`.
+
+Cuidado ao testar: `npm run preview` **não** reproduz o problema — o servidor do Vite já faz
+fallback de SPA por conta própria e passa mesmo sem o arquivo. A prova é `dist/_redirects`
+existir depois do build, e o site publicado responder.
 
 ---
 
