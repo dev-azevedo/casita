@@ -9,7 +9,7 @@ const props = defineProps({
   temFiltro: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['toggle', 'edit', 'remove', 'limpar'])
+const emit = defineEmits(['toggle', 'edit', 'remove', 'limpar', 'cancelar-reserva'])
 
 /** items já chega ordenado por categoria/prioridade do useItems. */
 const grupos = computed(() => {
@@ -53,6 +53,7 @@ const grupos = computed(() => {
           @toggle="(i, preco) => emit('toggle', i, preco)"
           @edit="emit('edit', $event)"
           @remove="emit('remove', $event)"
+          @cancelar-reserva="emit('cancelar-reserva', $event)"
         />
       </ul>
     </section>

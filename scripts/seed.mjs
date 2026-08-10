@@ -179,7 +179,7 @@ const totais = {
 console.log(`\nCSV lido: ${registros.length} itens`)
 console.log(`  Total geral estimado ..... ${brl(totais.geral)}`)
 console.log(`  Compra pessoal ........... ${brl(totais.pessoal)}`)
-console.log(`  Chá de panela ............ ${brl(totais.cha)}`)
+console.log(`  Chá de casa nova ......... ${brl(totais.cha)}`)
 console.log(`  Comprados ................ ${totais.comprados} / ${registros.length}\n`)
 
 if (dry) {

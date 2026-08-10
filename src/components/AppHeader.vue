@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { LogOut } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
+import { LogOut, Gift } from '@lucide/vue'
 import MarcaCasita from './MarcaCasita.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import AccentPicker from './AccentPicker.vue'
@@ -53,6 +54,16 @@ onBeforeUnmount(() => observador?.disconnect())
         <MarcaCasita />
 
         <span class="ml-auto hidden text-sm text-ink-faint sm:block">{{ email }}</span>
+
+        <!-- Ver a lista como o convidado vê — e pegar o link pra mandar. -->
+        <RouterLink
+          :to="{ name: 'presentes' }"
+          class="ml-auto grid size-11 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink sm:ml-0"
+          aria-label="Ver a lista pública de presentes"
+          title="Lista pública"
+        >
+          <Gift :size="19" :stroke-width="1.8" />
+        </RouterLink>
 
         <AccentPicker />
         <ThemeToggle />

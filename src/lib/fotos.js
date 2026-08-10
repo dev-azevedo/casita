@@ -15,11 +15,15 @@
  *
  * A PRIMEIRA da lista e a capa em tela cheia. As demais entram na faixa lateral.
  *
+ * NOTA: este arquivo e so o manifesto. Quem decide o que aparece na tela e
+ * src/composables/useFotos.js — em desenvolvimento nunca carregam, e o casal
+ * pode desligar todas pelo painel (Aparencia da casa).
+ *
  * ATENCAO: as legendas abaixo foram escritas olhando as fotos, mas os momentos sao
  * de voces — troque por como voces chamam cada um. Os anos ficaram em branco de
  * proposito: so voces sabem.
  */
-export const FOTOS = [
+export const TODAS = [
   { src: '/fotos/_01.JPEG', legenda: 'Correndo juntos', ano: '', objectPosition: 'center 32%' },
   { src: '/fotos/_13.JPEG', legenda: 'Outono no parque', ano: '', objectPosition: 'center 68%' },
   { src: '/fotos/_08.JPEG', legenda: 'A medalha e o beijo', ano: '', objectPosition: 'center 30%' },
@@ -51,7 +55,6 @@ export const VIDEO_CAPA = null
 
 /** Textos da capa. */
 export const CAPA = {
-  titulo: 'nossa casita',
+  titulo: 'Nossa Casa',
   subtitulo: 'Construindo nosso lar, um item de cada vez.',
-  selo: 'desde 2026',
 }

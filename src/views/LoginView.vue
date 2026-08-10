@@ -1,8 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from 'vue'
+import { useRouter, RouterLink } from 'vue-router'
+import { ArrowLeft } from '@lucide/vue'
 import { useAuth } from '@/composables/useAuth'
-import { FOTOS, CAPA } from '@/lib/fotos'
+import { useFotos } from '@/composables/useFotos'
+import { CAPA } from '@/lib/fotos'
 import MarcaCasita from '@/components/MarcaCasita.vue'
 import Casinha from '@/components/Casinha.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -10,7 +12,7 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
 const router = useRouter()
 const { signIn } = useAuth()
 
-const capa = computed(() => FOTOS[0] ?? null)
+const { capa } = useFotos()
 
 const email = ref('')
 const password = ref('')
@@ -22,7 +24,7 @@ async function onSubmit() {
   loading.value = true
   try {
     await signIn(email.value, password.value)
-    router.push({ name: 'home' })
+    router.push({ name: 'painel' })
   } catch (e) {
     error.value = e.message
   } finally {
@@ -145,6 +147,16 @@ const campo =
         <p class="surgir mt-8 text-xs text-ink-faint" style="--i: 3">
           Acesso restrito. Contas são criadas só pelo painel.
         </p>
+
+        <!-- Quem chegou aqui pelo "Acessar" do portal precisa de saída. -->
+        <RouterLink
+          :to="{ name: 'portal' }"
+          class="surgir mt-6 inline-flex min-h-11 items-center gap-2 text-sm text-ink-faint transition-colors hover:text-ink"
+          style="--i: 3"
+        >
+          <ArrowLeft :size="15" :stroke-width="2" />
+          Voltar para a lista de presentes
+        </RouterLink>
       </div>
     </div>
   </main>

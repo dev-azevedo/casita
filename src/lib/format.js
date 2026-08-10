@@ -33,3 +33,40 @@ export function parseBRL(value) {
 export function formatPercent(ratio) {
   return `${Math.round((Number(ratio) || 0) * 100)}%`
 }
+
+/** "(11) 98888-7777" -> "11988887777" */
+export function soDigitos(value) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
+/**
+ * Telefone e guardado so em digitos (o banco exige ^[0-9]{10,11}$ e o link do
+ * wa.me nao aceita pontuacao). A mascara existe so para ler.
+ *
+ * "11988887777" -> "(11) 98888-7777"   |   "1138887777" -> "(11) 3888-7777"
+ * Numero incompleto volta parcialmente formatado, para a mascara acompanhar a
+ * digitacao em vez de so aparecer no ultimo caractere.
+ */
+export function formatTelefone(value) {
+  const d = soDigitos(value).slice(0, 11)
+  if (d.length <= 2) return d
+  const ddd = `(${d.slice(0, 2)})`
+  if (d.length <= 6) return `${ddd} ${d.slice(2)}`
+  const corte = d.length > 10 ? 7 : 6
+  return `${ddd} ${d.slice(2, corte)}-${d.slice(corte)}`
+}
+
+const data = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' })
+
+/** '2026-08-03T14:22:00Z' -> '3 de agosto de 2026' */
+export function formatData(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : data.format(d)
+}
+
+/** Numero brasileiro para o formato que o wa.me espera (55 + DDD + numero). */
+export function linkWhatsApp(telefone) {
+  const d = soDigitos(telefone)
+  return d ? `https://wa.me/55${d}` : null
+}

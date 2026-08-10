@@ -8,10 +8,16 @@ try {
   const { default: router } = await import('./router')
   const { initAuth } = await import('./composables/useAuth')
   const { initTheme } = await import('./composables/useTheme')
+  const { useConfig } = await import('./composables/useConfig')
 
   // O script inline do index.html ja pintou o tema certo; aqui so assumimos o
   // controle reativo dele.
   initTheme()
+
+  // SEM await: a cor da casa vem do banco, e travar a montagem numa ida a rede
+  // deixaria a tela em branco a cada carregamento. Ela chega em seguida e
+  // repinta; o cache faz a segunda visita ja abrir certa.
+  useConfig().initConfig()
 
   // Resolve a sessao antes de montar para o guard de rota nao piscar o login.
   await initAuth()

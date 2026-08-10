@@ -56,12 +56,23 @@ export const COR_PADRAO = 'musgo'
 export const TEMA_PADRAO = 'sistema'
 
 export const CHAVES = {
+  // Preferencia de quem esta olhando, so dele. Nao vai para o banco.
   tema: 'casita:tema',
+  // ATENCAO: isto deixou de ser "a cor que EU escolhi". A cor da casa agora
+  // mora em public.configuracoes e vale para todo mundo; esta chave e so o
+  // cache da ultima cor vista, para o script inline do index.html pintar certo
+  // antes da resposta do banco chegar.
   cor: 'casita:cor',
   // Par h/c ja resolvido. Existe para o script inline do index.html pintar antes
   // da primeira pintura sem precisar carregar (nem duplicar) a tabela acima.
   hc: 'casita:hc',
   tour: 'casita:onboarded:v1',
+  // { nome, telefone } de quem ja reservou algo neste aparelho, para nao pedir
+  // duas vezes. Telefone so em digitos.
+  convidado: 'casita:convidado:v1',
+  // Espelho de public.configuracoes: { cor, mostrarFotos }. Serve para a tela
+  // abrir no ultimo estado conhecido em vez de piscar o padrao a cada visita.
+  config: 'casita:config:v1',
 }
 
 /** Presets agrupados, na ordem em que aparecem no seletor. */

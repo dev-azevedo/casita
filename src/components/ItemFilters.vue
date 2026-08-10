@@ -1,23 +1,50 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Search, SlidersHorizontal, X } from '@lucide/vue'
-import { CATEGORIAS, PRIORIDADES, STATUS, TIPOS } from '@/lib/constants'
+import { CATEGORIAS, PRIORIDADES, STATUS, TIPOS, TIPO_ROTULO } from '@/lib/constants'
+import MarcaPrioridade from './MarcaPrioridade.vue'
 
 const filtros = defineModel({ type: Object, required: true })
 
+/**
+ * Os grupos vem de fora porque a lista publica filtra outra coisa: la nao
+ * existe "Status" nem "Tipo" (vocabulario interno), existe "Disponibilidade".
+ * O painel privado nao passa nada e fica com o conjunto de sempre.
+ *
+ * `comMarca` liga a marca de prioridade nas opcoes do grupo — a mesma marca que
+ * aparece nas linhas da lista. Sem ela, escolher no filtro e um exercicio de
+ * traduzir palavra para bolinha de cabeca.
+ *
+ * `rotulos` mapeia valor guardado -> texto na tela, para os casos em que o nome
+ * do banco nao e o nome que a gente usa (ver TIPO_ROTULO).
+ */
+const props = defineProps({
+  grupos: {
+    type: Array,
+    default: () => [
+      { chave: 'categoria', rotulo: 'Cômodo', opcoes: CATEGORIAS },
+      { chave: 'prioridade', rotulo: 'Prioridade', opcoes: PRIORIDADES, comMarca: true },
+      { chave: 'status', rotulo: 'Status', opcoes: STATUS },
+      { chave: 'tipo', rotulo: 'Tipo', opcoes: TIPOS, rotulos: TIPO_ROTULO },
+    ],
+  },
+})
+
+const textoDe = (grupo, valor) => grupo.rotulos?.[valor] ?? valor
+
 const aberto = ref(false)
 
-const GRUPOS = [
-  { chave: 'categoria', rotulo: 'Cômodo', opcoes: CATEGORIAS },
-  { chave: 'prioridade', rotulo: 'Prioridade', opcoes: PRIORIDADES },
-  { chave: 'status', rotulo: 'Status', opcoes: STATUS },
-  { chave: 'tipo', rotulo: 'Tipo', opcoes: TIPOS },
-]
+const ativos = computed(() => props.grupos.filter((g) => filtros.value[g.chave]))
 
-const ativos = computed(() => GRUPOS.filter((g) => filtros.value[g.chave]))
-
+/**
+ * Zera derivando das chaves em vez de reescrever o objeto na mao — antes o
+ * mesmo literal vivia aqui e em dois pontos da HomeView, e bastava um filtro
+ * novo em um deles para os tres saírem de sincronia.
+ */
 function limpar() {
-  filtros.value = { busca: '', categoria: '', prioridade: '', status: '', tipo: '' }
+  const zerado = { busca: '' }
+  for (const g of props.grupos) zerado[g.chave] = ''
+  filtros.value = zerado
 }
 
 function alternar(chave, valor) {
@@ -70,7 +97,8 @@ function alternar(chave, valor) {
         class="flex items-center gap-1.5 rounded-full bg-accent-soft py-1.5 pr-2 pl-3 text-xs font-medium text-accent-ink transition-opacity hover:opacity-75"
         @click="filtros[g.chave] = ''"
       >
-        {{ filtros[g.chave] }}
+        <MarcaPrioridade v-if="g.comMarca" :prioridade="filtros[g.chave]" :tamanho="10" />
+        {{ textoDe(g, filtros[g.chave]) }}
         <X :size="13" :stroke-width="2.4" />
       </button>
       <button
@@ -119,7 +147,7 @@ function alternar(chave, valor) {
             </div>
 
             <div class="space-y-6 px-6 pt-2">
-              <fieldset v-for="g in GRUPOS" :key="g.chave">
+              <fieldset v-for="g in grupos" :key="g.chave">
                 <legend class="mb-2.5 text-xs tracking-[0.16em] text-ink-faint uppercase">
                   {{ g.rotulo }}
                 </legend>
@@ -128,7 +156,7 @@ function alternar(chave, valor) {
                     v-for="op in g.opcoes"
                     :key="op"
                     type="button"
-                    class="min-h-11 rounded-full border px-4 text-sm transition-colors"
+                    class="inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm transition-colors"
                     :class="
                       filtros[g.chave] === op
                         ? 'border-accent bg-accent-soft font-medium text-accent-ink'
@@ -137,7 +165,10 @@ function alternar(chave, valor) {
                     :aria-pressed="filtros[g.chave] === op"
                     @click="alternar(g.chave, op)"
                   >
-                    {{ op }}
+                    <!-- Cor e forma, iguais às da lista: a marca é o que liga o
+                         filtro ao que aparece na linha. -->
+                    <MarcaPrioridade v-if="g.comMarca" :prioridade="op" :tamanho="11" />
+                    {{ textoDe(g, op) }}
                   </button>
                 </div>
               </fieldset>

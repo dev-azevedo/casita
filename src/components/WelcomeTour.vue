@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
             <div class="flex gap-4">
               <span class="mt-2 h-px w-8 shrink-0 bg-accent" aria-hidden="true" />
               <div>
-                <dt class="font-medium text-ink">Chá de panela</dt>
+                <dt class="font-medium text-ink">Chá de casa nova</dt>
                 <dd class="tnum mt-0.5 text-sm text-ink-soft">
                   {{ formatBRL(metrics.totalChaPanela) }} — o que a gente vai pedir de presente.
                 </dd>

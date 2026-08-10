@@ -101,6 +101,9 @@
   --color-surface-2: var(--surface-2);
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);
+  /* Faltava: sem esta linha `border-line-strong` nao vira classe nenhuma e os
+     campos de formulario caem em currentColor, perdendo o 3:1 do token. */
+  --color-line-strong: var(--line-strong);
 
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);

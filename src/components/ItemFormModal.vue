@@ -1,8 +1,9 @@
 <script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { X, ChevronRight } from '@lucide/vue'
-import { CATEGORIAS, PRIORIDADES, STATUS, TIPOS } from '@/lib/constants'
+import { CATEGORIAS, PRIORIDADES, STATUS, TIPOS, rotuloTipo } from '@/lib/constants'
 import { formatBRL } from '@/lib/format'
+import { useTecladoVirtual } from '@/composables/useTecladoVirtual'
 
 const props = defineProps({
   /** null = criar novo; objeto = editar */
@@ -13,6 +14,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'save'])
+
+// 8 campos digitados no celular: sem isto o teclado engole o rodape e o
+// "Salvar" so aparece rolando as cegas.
+useTecladoVirtual()
 
 const vazio = () => ({
   categoria: CATEGORIAS[0],
@@ -80,12 +85,23 @@ function onSubmit() {
 const campo =
   'w-full min-h-12 rounded-xl border border-line-strong bg-surface-0 px-3.5 text-ink outline-none transition-colors focus:border-accent'
 const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
+
+/** O corpo e que rola: o campo focado precisa de folga para o rotulo nao sumir. */
+const bloco = 'scroll-mt-4 scroll-mb-4'
+
+const rodape =
+  'shrink-0 border-t border-line-soft px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]'
 </script>
 
 <template>
+  <!-- Véu separado do painel: continua cobrindo a tela toda mesmo quando o
+       wrapper encolhe para caber acima do teclado. -->
+  <div class="fixed inset-0 z-[85]" style="background: var(--scrim)" @click="emit('close')" />
+
+  <!-- Ancorado no viewport VISUAL — o único que encolhe com o teclado aberto. -->
   <div
-    class="fixed inset-0 z-[85] flex items-end justify-center sm:items-center sm:p-4"
-    style="background: var(--scrim)"
+    class="fixed left-0 z-[85] flex w-full items-end justify-center pt-10 sm:items-center sm:px-4 sm:py-4"
+    style="top: var(--vv-top, 0px); height: var(--vv-h, 100svh)"
     @click.self="emit('close')"
   >
     <form
@@ -93,15 +109,13 @@ const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
       role="dialog"
       aria-modal="true"
       :aria-label="editando ? 'Editar item' : 'Novo item'"
-      class="max-h-[92svh] w-full overflow-y-auto rounded-t-3xl border-t border-line bg-surface-1 sm:max-w-lg sm:rounded-3xl sm:border"
-      style="
-        animation: surgir 340ms cubic-bezier(0.16, 1, 0.3, 1);
-        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
-      "
+      class="flex max-h-full w-full flex-col rounded-t-3xl border-t border-line bg-surface-1 sm:max-w-lg sm:rounded-3xl sm:border"
+      style="animation: surgir 340ms cubic-bezier(0.16, 1, 0.3, 1)"
       @submit.prevent="onSubmit"
     >
+      <!-- Deixou de precisar de `sticky`: o cabeçalho não rola mais junto. -->
       <div
-        class="sticky top-0 z-10 flex items-center justify-between border-b border-line-soft bg-surface-1 px-6 py-4"
+        class="flex shrink-0 items-center justify-between border-b border-line-soft px-6 py-4"
       >
         <h2 class="text-lg font-semibold text-ink">{{ editando ? 'Editar item' : 'Novo item' }}</h2>
         <button
@@ -114,8 +128,10 @@ const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
         </button>
       </div>
 
-      <div class="space-y-4 px-6 pt-5">
-        <div>
+      <!-- `min-h-0` libera o encolhimento: sem ele o mínimo automático do flex
+           empurra o rodapé para fora da tela quando o teclado abre. -->
+      <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pt-5 pb-5">
+        <div :class="bloco">
           <label :class="rotulo" for="f-item">O que é</label>
           <input
             id="f-item"
@@ -143,7 +159,8 @@ const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
           <div>
             <label :class="rotulo" for="f-tipo">Tipo</label>
             <select id="f-tipo" v-model="form.tipo" :class="campo">
-              <option v-for="t in TIPOS" :key="t" :value="t">{{ t }}</option>
+              <!-- value = o que vai pro banco; texto = como a gente chama. -->
+              <option v-for="t in TIPOS" :key="t" :value="t">{{ rotuloTipo(t) }}</option>
             </select>
           </div>
           <div>
@@ -190,7 +207,7 @@ const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
           </span>
         </div>
 
-        <div v-if="form.status === 'Comprado'">
+        <div v-if="form.status === 'Comprado'" :class="bloco">
           <label :class="rotulo" for="f-real">Quanto pagou</label>
           <input
             id="f-real"
@@ -216,11 +233,11 @@ const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
             Link e observações
           </summary>
           <div class="space-y-4 px-3.5 pt-1 pb-4">
-            <div>
+            <div :class="bloco">
               <label :class="rotulo" for="f-link">Link</label>
               <input id="f-link" v-model="form.link" type="url" :class="campo" placeholder="https://…" />
             </div>
-            <div>
+            <div :class="bloco">
               <label :class="rotulo" for="f-obs">Observações</label>
               <textarea id="f-obs" v-model="form.observacoes" rows="2" :class="[campo, 'py-3']" />
             </div>
@@ -228,25 +245,29 @@ const rotulo = 'mb-1.5 block text-xs uppercase tracking-[0.14em] text-ink-faint'
         </details>
       </div>
 
-      <p v-if="error" class="mx-6 mt-4 rounded-xl bg-danger-soft px-3.5 py-3 text-sm text-danger">
-        {{ error }}
-      </p>
+      <div :class="rodape">
+        <!-- Erro no rodapé: no corpo ele poderia nascer fora da área visível e a
+             pessoa só veria o botão não funcionar. -->
+        <p v-if="error" class="mb-3 rounded-xl bg-danger-soft px-3.5 py-3 text-sm text-danger">
+          {{ error }}
+        </p>
 
-      <div class="mt-6 flex gap-3 px-6">
-        <button
-          type="button"
-          class="min-h-12 rounded-full px-5 text-sm text-ink-soft transition-colors hover:bg-surface-2"
-          @click="emit('close')"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          :disabled="saving"
-          class="min-h-12 flex-1 rounded-full bg-accent px-5 font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
-        >
-          {{ saving ? 'Salvando…' : 'Salvar' }}
-        </button>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="min-h-12 rounded-full px-5 text-sm text-ink-soft transition-colors hover:bg-surface-2"
+            @click="emit('close')"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            :disabled="saving"
+            class="min-h-12 flex-1 rounded-full bg-accent px-5 font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+          >
+            {{ saving ? 'Salvando…' : 'Salvar' }}
+          </button>
+        </div>
       </div>
     </form>
   </div>

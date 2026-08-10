@@ -24,6 +24,17 @@ const pct = computed(() => Math.min(100, Math.max(0, props.metrics.progresso * 1
         >
           {{ formatBRL(metrics.faltaGastar) }}
         </p>
+
+        <!-- Decomposição do herói, não um segundo herói: parte desse valor já
+             tem dono. Só aparece quando existe reserva — sem convidado ainda,
+             a linha seria só ruído. -->
+        <p v-if="metrics.reservado > 0" class="tnum mt-2 text-sm text-ink-soft">
+          <span class="font-medium text-accent">{{ formatBRL(metrics.reservado) }}</span>
+          reservado em {{ metrics.itensReservados }}
+          {{ metrics.itensReservados === 1 ? 'item' : 'itens' }} ·
+          <span class="font-medium text-ink">{{ formatBRL(metrics.faltaEmAberto) }}</span>
+          por nossa conta
+        </p>
       </div>
 
       <dl class="flex flex-wrap gap-x-8 gap-y-4 text-sm">
@@ -32,7 +43,7 @@ const pct = computed(() => Math.min(100, Math.max(0, props.metrics.progresso * 1
           <dd class="tnum mt-0.5 font-semibold text-accent">{{ formatBRL(metrics.jaGasto) }}</dd>
         </div>
         <div>
-          <dt class="text-ink-faint">Chá de panela</dt>
+          <dt class="text-ink-faint">Chá de casa nova</dt>
           <dd class="tnum mt-0.5 font-semibold text-ink">{{ formatBRL(metrics.totalChaPanela) }}</dd>
         </div>
         <div>

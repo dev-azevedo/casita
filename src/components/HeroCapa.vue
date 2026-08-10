@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ArrowDown } from '@lucide/vue'
-import { FOTOS, CAPA, VIDEO_CAPA } from '@/lib/fotos'
+import { CAPA, VIDEO_CAPA } from '@/lib/fotos'
+import { useFotos } from '@/composables/useFotos'
 import Casinha from './Casinha.vue'
 
 const emit = defineEmits(['abrir-foto'])
 
-const capa = computed(() => FOTOS[0] ?? null)
+const { capa, ocultasPelaAparencia, ehDev } = useFotos()
 const secao = ref(null)
 const progresso = ref(0) // 0 no topo, 1 quando a capa saiu
 
@@ -118,18 +119,10 @@ function irParaLista() {
       style="padding-bottom: max(4rem, calc(env(safe-area-inset-bottom) + 4rem))"
     >
       <div :style="capa ? estiloTexto : {}">
-        <p
-          class="surgir mb-4 text-xs tracking-[0.28em] uppercase"
-          :class="capa ? 'text-white/70' : 'text-accent-ink'"
-          style="--i: 0"
-        >
-          {{ CAPA.selo }}
-        </p>
-
         <h1
           class="surgir max-w-[13ch] text-hero font-semibold"
           :class="capa ? 'text-white' : 'text-ink'"
-          style="--i: 1; font-variation-settings: 'SOFT' 90, 'WONK' 1, 'opsz' 144"
+          style="--i: 0; font-variation-settings: 'SOFT' 90, 'WONK' 1, 'opsz' 144"
         >
           {{ CAPA.titulo }}
         </h1>
@@ -137,15 +130,25 @@ function irParaLista() {
         <p
           class="surgir mt-5 max-w-[40ch] text-lg"
           :class="capa ? 'text-white/85' : 'text-ink-soft'"
-          style="--i: 2"
+          style="--i: 1"
         >
           {{ CAPA.subtitulo }}
         </p>
 
         <!-- Sem foto: a casinha segura a cena e ensina o próximo passo -->
-        <div v-if="!capa" class="surgir mt-10 flex items-center gap-5" style="--i: 3">
+        <div v-if="!capa" class="surgir mt-10 flex items-center gap-5" style="--i: 2">
           <Casinha variante="casa" :tamanho="104" class="flutuar text-accent" />
-          <p class="max-w-[32ch] text-sm text-ink-soft">
+          <!-- Três motivos diferentes para não haver capa; a dica precisa dizer
+               qual é, senão manda arrumar o que não está quebrado. -->
+          <p v-if="ocultasPelaAparencia" class="max-w-[32ch] text-sm text-ink-soft">
+            Fotos ocultas. Para mostrar de novo, abra
+            <strong class="font-medium text-ink">Aparência da casa</strong> no topo.
+          </p>
+          <p v-else-if="ehDev" class="max-w-[32ch] text-sm text-ink-soft">
+            Fotos desligadas em desenvolvimento. Elas voltam no
+            <code class="rounded bg-surface-2 px-1.5 py-0.5 text-ink">npm run build</code>.
+          </p>
+          <p v-else class="max-w-[32ch] text-sm text-ink-soft">
             Coloque as fotos em
             <code class="rounded bg-surface-2 px-1.5 py-0.5 text-ink">public/fotos/</code>
             e liste em
@@ -157,7 +160,7 @@ function irParaLista() {
           type="button"
           class="surgir mt-12 flex items-center gap-3 text-sm transition-opacity hover:opacity-70"
           :class="capa ? 'text-white/80' : 'text-ink-soft'"
-          style="--i: 4"
+          style="--i: 3"
           @click="irParaLista"
         >
           <span

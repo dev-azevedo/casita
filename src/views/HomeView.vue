@@ -6,7 +6,9 @@ import { Plus, Rose} from '@lucide/vue'
 import { useAuth } from '@/composables/useAuth'
 import { useItems } from '@/composables/useItems'
 import { useOnboarding } from '@/composables/useOnboarding'
-import { FOTOS } from '@/lib/fotos'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import { useConfig } from '@/composables/useConfig'
+import { useFotos } from '@/composables/useFotos'
 
 import AppHeader from '@/components/AppHeader.vue'
 import HeroCapa from '@/components/HeroCapa.vue'
@@ -18,6 +20,7 @@ import ItemFilters from '@/components/ItemFilters.vue'
 import ItemList from '@/components/ItemList.vue'
 import ItemFormModal from '@/components/ItemFormModal.vue'
 import ConfirmarExclusao from '@/components/ConfirmarExclusao.vue'
+import ConfirmarCancelamentoReserva from '@/components/ConfirmarCancelamentoReserva.vue'
 import WelcomeTour from '@/components/WelcomeTour.vue'
 import Casinha from '@/components/Casinha.vue'
 
@@ -31,13 +34,17 @@ const {
   addItem,
   updateItem,
   deleteItem,
+  cancelarReserva,
   toggleComprado,
   metrics,
   porPrioridade,
 } = useItems()
 const { visivel: tourVisivel, verificar, concluir, reabrir } = useOnboarding()
+const { fetchConfig } = useConfig()
+const { fotos } = useFotos()
 
-const filtros = ref({ busca: '', categoria: '', prioridade: '', status: '', tipo: '' })
+const vazios = () => ({ busca: '', categoria: '', prioridade: '', status: '', tipo: '' })
+const filtros = ref(vazios())
 
 const formAberto = ref(false)
 const itemEditando = ref(null)
@@ -47,11 +54,19 @@ const aviso = ref('')
 const fotoAberta = ref(null)
 const itemParaExcluir = ref(null)
 const excluindo = ref(false)
+/** { item, reserva } — o dialogo mostra os dois. */
+const reservaParaCancelar = ref(null)
+const cancelandoReserva = ref(false)
 
 onMounted(() => {
   fetchItems()
   verificar()
 })
+
+// As reservas dos convidados chegam sozinhas, sem F5. O modo silencioso cede a
+// vez para qualquer edição em andamento — ver a guarda em useItems.
+// A config vem junto para os dois admins não divergirem de cor.
+useAutoRefresh(() => Promise.all([fetchItems({ silencioso: true }), fetchConfig()]))
 
 const temFiltro = computed(() =>
   Object.values(filtros.value).some((v) => v !== ''),
@@ -73,7 +88,7 @@ const itensFiltrados = computed(() => {
 })
 
 function limparFiltros() {
-  filtros.value = { busca: '', categoria: '', prioridade: '', status: '', tipo: '' }
+  filtros.value = vazios()
 }
 
 function abrirNovo() {
@@ -135,9 +150,23 @@ function mostrarAviso(msg) {
   avisoTimer = setTimeout(() => (aviso.value = ''), 4500)
 }
 
+async function confirmarCancelamentoReserva() {
+  const { reserva } = reservaParaCancelar.value
+  cancelandoReserva.value = true
+  try {
+    await cancelarReserva(reserva.id)
+    mostrarAviso(`A reserva de ${reserva.nome} foi cancelada.`)
+    reservaParaCancelar.value = null
+  } catch (e) {
+    mostrarAviso(e.message)
+  } finally {
+    cancelandoReserva.value = false
+  }
+}
+
 async function sair() {
   await signOut()
-  router.push({ name: 'login' })
+  router.push({ name: 'portal' })
 }
 </script>
 
@@ -188,6 +217,7 @@ async function sair() {
               @edit="abrirEdicao"
               @remove="pedirExclusao"
               @limpar="limparFiltros"
+              @cancelar-reserva="reservaParaCancelar = $event"
             />
           </div>
         </div>
@@ -236,9 +266,18 @@ async function sair() {
       @confirmar="confirmarExclusao"
     />
 
+    <ConfirmarCancelamentoReserva
+      v-if="reservaParaCancelar"
+      :item="reservaParaCancelar.item"
+      :reserva="reservaParaCancelar.reserva"
+      :cancelando="cancelandoReserva"
+      @fechar="reservaParaCancelar = null"
+      @confirmar="confirmarCancelamentoReserva"
+    />
+
     <Lightbox
       v-if="fotoAberta !== null"
-      :fotos="FOTOS"
+      :fotos="fotos"
       :indice="fotoAberta"
       @fechar="fotoAberta = null"
       @navegar="fotoAberta = $event"

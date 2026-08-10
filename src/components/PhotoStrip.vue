@@ -1,11 +1,15 @@
 <script setup>
 import { computed } from 'vue'
-import { FOTOS } from '@/lib/fotos'
+import { useFotos } from '@/composables/useFotos'
 
 const emit = defineEmits(['abrir-foto'])
 
+const { fotos } = useFotos()
+
 /** A primeira já é a capa; aqui vão as demais. */
-const restantes = computed(() => FOTOS.slice(1).map((foto, i) => ({ foto, indice: i + 1 })))
+const restantes = computed(() =>
+  fotos.value.slice(1).map((foto, i) => ({ foto, indice: i + 1 })),
+)
 </script>
 
 <template>
