@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight } from '@lucide/vue'
+import { ArrowRight, KeyRound } from '@lucide/vue'
 
 import { useAuth } from '@/composables/useAuth'
 import { useConvite } from '@/composables/useConvite'
@@ -60,7 +60,20 @@ onMounted(verificar)
       "
     />
 
-    <div class="absolute top-4 right-4 z-10">
+    <!-- Canto dos donos da casa. O "Acessar" vira icone e encosta no tema porque
+         convidado nao precisa dele: no meio dos CTAs ele competia com a lista de
+         presentes; aqui some no cromo da pagina sem virar segredo — quem procura
+         acha, e o aria-label continua dizendo o que e. -->
+    <div class="absolute top-4 right-4 z-10 flex items-center gap-1">
+      <RouterLink
+        :to="{ name: isLoggedIn ? 'painel' : 'login' }"
+        :title="isLoggedIn ? 'Voltar ao painel' : 'Acessar'"
+        :aria-label="isLoggedIn ? 'Voltar ao painel' : 'Acessar'"
+        class="grid size-11 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
+      >
+        <KeyRound :size="19" :stroke-width="1.8" />
+      </RouterLink>
+
       <ThemeToggle />
     </div>
 
@@ -95,7 +108,13 @@ onMounted(verificar)
           {{ CAPA.subtitulo }}
         </p>
 
-        <div class="surgir mt-10 flex flex-wrap items-center gap-x-8 gap-y-5" style="--i: 3">
+        <!-- No celular a coluna e fixa, nao herdada do wrap: com `flex-wrap` a
+             quebra dependia da largura do texto. Empilhado, a acao principal fica
+             sempre sozinha na primeira linha e o resto sempre abaixo. -->
+        <div
+          class="surgir mt-10 flex flex-col items-start gap-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8"
+          style="--i: 3"
+        >
           <RouterLink
             :to="{ name: 'presentes' }"
             class="group flex min-h-14 items-center gap-3 rounded-full bg-accent pr-6 pl-7 text-base font-medium text-on-accent shadow-elev-3 transition-transform duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] hover:scale-[1.03] active:scale-95"
@@ -108,17 +127,9 @@ onMounted(verificar)
             />
           </RouterLink>
 
-          <!-- Um degrau abaixo: sem caixa, sem cor, mas com alvo de toque cheio -->
-          <RouterLink
-            :to="{ name: isLoggedIn ? 'painel' : 'login' }"
-            class="flex min-h-11 items-center text-sm underline decoration-1 underline-offset-4 transition-colors"
-            :class="capa ? 'text-white/55 hover:text-white' : 'text-ink-faint hover:text-ink'"
-          >
-            {{ isLoggedIn ? 'Voltar ao painel' : 'Acessar' }}
-          </RouterLink>
-
-          <!-- Mesmo degrau do 'Acessar': o convite ja abriu sozinho na chegada,
-               este botao e so para quem quiser voltar a olhar. -->
+          <!-- Um degrau abaixo: sem caixa, sem cor, mas com alvo de toque cheio.
+               O convite ja abriu sozinho na chegada, este botao e so para quem
+               quiser voltar a olhar. -->
           <button
             type="button"
             class="flex min-h-11 items-center text-sm underline decoration-1 underline-offset-4 transition-colors"
