@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowLeft } from '@lucide/vue'
+import { ArrowLeft, MailOpen } from '@lucide/vue'
 
 import { usePresentes } from '@/composables/usePresentes'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useConvidado } from '@/composables/useConvidado'
+import { useConvite } from '@/composables/useConvite'
 import { useMinhasReservas } from '@/composables/useMinhasReservas'
 import { useConfig } from '@/composables/useConfig'
 import { CATEGORIAS, PRIORIDADES, DISPONIBILIDADE } from '@/lib/constants'
@@ -20,6 +21,7 @@ import ReservaModal from '@/components/ReservaModal.vue'
 import IdentificarModal from '@/components/IdentificarModal.vue'
 import DesfazerReserva from '@/components/DesfazerReserva.vue'
 import ComoEntregar from '@/components/ComoEntregar.vue'
+import ConviteModal from '@/components/ConviteModal.vue'
 
 /**
  * A lista que os convidados recebem por link. Sem login, sem cadastro.
@@ -30,6 +32,13 @@ import ComoEntregar from '@/components/ComoEntregar.vue'
  */
 const { presentes, loading, error, fetchPresentes, reservar, total, reservados, progresso } =
   usePresentes()
+
+const {
+  visivel: conviteVisivel,
+  verificar: verificarConvite,
+  abrir: abrirConvite,
+  fechar: fecharConvite,
+} = useConvite()
 
 const vazios = () => ({ busca: '', categoria: '', prioridade: '', disponibilidade: '' })
 const filtros = ref(vazios())
@@ -97,17 +106,33 @@ const indisponivel = computed(
   () => !modoEntrega.value && !sucesso.value && !!escolhidoAtual.value?.reservado,
 )
 
-onMounted(async () => {
-  fetchPresentes()
-  // Quem já reservou neste aparelho não é perguntado: o telefone guardado vale
-  // como resposta. A pergunta é para o navegador novo — que é justamente onde a
-  // memória local não existe.
+/**
+ * Quem já reservou neste aparelho não é perguntado: o telefone guardado vale
+ * como resposta. A pergunta é para o navegador novo — que é justamente onde a
+ * memória local não existe.
+ *
+ * Nunca roda com o convite na tela: os dois abrem no mesmo instante e a pergunta
+ * ficaria escondida atrás dele, respondida no escuro ou dispensada sem ser vista.
+ */
+async function talvezPerguntarIdentificacao() {
   const reconhecido = await restaurar()
   if (!reconhecido && !foiDispensado()) {
     perguntaAutomatica.value = true
     mostrarIdentificar.value = true
   }
+}
+
+onMounted(() => {
+  fetchPresentes()
+  verificarConvite()
+  if (!conviteVisivel.value) talvezPerguntarIdentificacao()
 })
+
+/** O convite sai da frente e a pergunta assume o lugar dele. */
+function aoFecharConvite() {
+  fecharConvite()
+  talvezPerguntarIdentificacao()
+}
 
 // A lista anda sozinha: numa festa, dois convidados olhando a mesma tela
 // precisam ver o item sair. `silencioso` evita piscar o carregamento.
@@ -300,6 +325,14 @@ async function confirmarDesfazer() {
         </RouterLink>
         <MarcaCasita />
         <span class="flex-1" />
+        <button
+          type="button"
+          class="grid size-11 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
+          aria-label="Ver convite"
+          @click="abrirConvite"
+        >
+          <MailOpen :size="19" :stroke-width="2" />
+        </button>
         <ThemeToggle />
       </div>
     </header>
@@ -455,6 +488,14 @@ async function confirmarDesfazer() {
 
       <footer class="mt-16 border-t border-line-soft pt-8 text-center text-sm text-ink-faint">
         <p>Obrigado por fazer parte da nossa casa.</p>
+        <!-- Quem rolou a lista inteira chegou aqui longe do botão do topo. -->
+        <button
+          type="button"
+          class="mt-2 inline-flex min-h-11 items-center underline decoration-1 underline-offset-4 transition-colors hover:text-ink"
+          @click="abrirConvite"
+        >
+          Ver o convite
+        </button>
       </footer>
     </main>
 
@@ -477,6 +518,8 @@ async function confirmarDesfazer() {
       @dispensar="dispensarIdentificacao"
       @fechar="fecharIdentificacao"
     />
+
+    <ConviteModal v-if="conviteVisivel" @fechar="aoFecharConvite" />
 
     <DesfazerReserva
       v-if="paraDesfazer"

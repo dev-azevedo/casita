@@ -1,11 +1,14 @@
 <script setup>
+import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowRight } from '@lucide/vue'
 
 import { useAuth } from '@/composables/useAuth'
+import { useConvite } from '@/composables/useConvite'
 import { useFotos } from '@/composables/useFotos'
 import { CAPA } from '@/lib/fotos'
 import Casinha from '@/components/Casinha.vue'
+import ConviteModal from '@/components/ConviteModal.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
 /**
@@ -18,6 +21,10 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
  */
 const { isLoggedIn } = useAuth()
 const { capa } = useFotos()
+
+const { visivel: conviteVisivel, verificar, abrir: abrirConvite, fechar: fecharConvite } = useConvite()
+
+onMounted(verificar)
 </script>
 
 <template>
@@ -109,8 +116,21 @@ const { capa } = useFotos()
           >
             {{ isLoggedIn ? 'Voltar ao painel' : 'Acessar' }}
           </RouterLink>
+
+          <!-- Mesmo degrau do 'Acessar': o convite ja abriu sozinho na chegada,
+               este botao e so para quem quiser voltar a olhar. -->
+          <button
+            type="button"
+            class="flex min-h-11 items-center text-sm underline decoration-1 underline-offset-4 transition-colors"
+            :class="capa ? 'text-white/55 hover:text-white' : 'text-ink-faint hover:text-ink'"
+            @click="abrirConvite"
+          >
+            Ver o convite
+          </button>
         </div>
       </div>
     </div>
+
+    <ConviteModal v-if="conviteVisivel" @fechar="fecharConvite" />
   </main>
 </template>
