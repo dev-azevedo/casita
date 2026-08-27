@@ -108,6 +108,41 @@ export function useItems() {
     })
 
   /**
+   * Reserva feita pelo casal, em nome de um convidado que avisou por fora — no
+   * grupo da familia, no corredor do predio, por WhatsApp.
+   *
+   * Escreve direto em `reservas` em vez de chamar reservar_presente(): aquela
+   * funcao existe para o anonimo e recusa item que nao esteja na lista publica
+   * (ITEM_INDISPONIVEL). O casal ve a lista inteira e decide sobre ela inteira;
+   * a policy de `authenticated` ja permite. Quem impede reserva dupla continua
+   * sendo o indice unico, nao uma checagem daqui.
+   *
+   * `telefone` tem que chegar so em digitos — o check da coluna e ^[0-9]{10,11}$.
+   */
+  const reservarItem = (itemId, nome, telefone) =>
+    comMutacao(async () => {
+      const { data, error: err } = await supabase
+        .from('reservas')
+        .insert({ item_id: itemId, nome, telefone })
+        // Mesmas colunas do embed em fetchItems: sem elas o selo do convidado
+        // nasceria vazio na linha ate o proximo ciclo de refresh.
+        .select('id, nome, telefone, created_at')
+        .single()
+      if (err) {
+        // 23505 = unique_violation em reservas_item_unico. Um convidado clicou
+        // no mesmo item enquanto o dialogo estava aberto.
+        throw new Error(
+          err.code === '23505'
+            ? 'Um convidado reservou esse item agora mesmo. Atualize a lista para ver quem foi.'
+            : err.message,
+        )
+      }
+      const alvo = items.value.find((i) => i.id === itemId)
+      if (alvo) alvo.reservas = [data]
+      return data
+    })
+
+  /**
    * Convidado desistiu, mandou mensagem dizendo que nao vai dar, comprou outra
    * coisa. Some a reserva e o item volta a aparecer disponivel na lista publica.
    */
@@ -131,54 +166,11 @@ export function useItems() {
     })
   }
 
-  // --- Metricas (rodape da planilha, recalculado ao vivo) -------------------
-
-  const comprados = computed(() => items.value.filter((i) => i.status === 'Comprado'))
-  const aComprar = computed(() => items.value.filter((i) => i.status !== 'Comprado'))
-
-  const somaEstimado = (list) => list.reduce((acc, i) => acc + num(i.preco_estimado), 0)
-
-  /**
-   * Item que um convidado ja chamou de seu. So conta o que ainda nao foi
-   * comprado: depois que entra em casa, quem pagou vira assunto de `jaGasto` e
-   * contar de novo aqui inflaria o "falta".
-   */
-  const reservadosPendentes = computed(() =>
-    aComprar.value.filter((i) => (i.reservas?.length ?? 0) > 0),
-  )
-
-  const metrics = computed(() => {
-    const total = items.value.length
-    const faltaGastar = somaEstimado(aComprar.value)
-    const reservado = somaEstimado(reservadosPendentes.value)
-    return {
-      totalGeral: somaEstimado(items.value),
-      totalPessoal: somaEstimado(items.value.filter((i) => i.tipo === 'Compra pessoal')),
-      totalChaPanela: somaEstimado(items.value.filter((i) => i.tipo === 'Chá de Panela')),
-      jaGasto: comprados.value.reduce((acc, i) => acc + num(i.preco_real), 0),
-      faltaGastar,
-      /** Quanto os convidados ja assumiram. */
-      reservado,
-      itensReservados: reservadosPendentes.value.length,
-      /** O que sobra de fato para o casal — reservas descontadas. */
-      faltaEmAberto: faltaGastar - reservado,
-      comprados: comprados.value.length,
-      total,
-      progresso: total ? comprados.value.length / total : 0,
-    }
-  })
-
-  const porPrioridade = computed(() =>
-    Object.keys(PRIORIDADE_ORDEM).map((prioridade) => {
-      const doGrupo = items.value.filter((i) => i.prioridade === prioridade)
-      return {
-        prioridade,
-        total: doGrupo.length,
-        comprados: doGrupo.filter((i) => i.status === 'Comprado').length,
-        estimado: somaEstimado(doGrupo),
-      }
-    }),
-  )
+  // Os totalizadores seguem o que esta na tela. A funcao pura mora no fim do
+  // arquivo; aqui ficam so os numeros da lista inteira, que e o que o resto do
+  // app (o tour de boas-vindas, por exemplo) espera enxergar.
+  const metrics = computed(() => calcularMetricas(items.value))
+  const porPrioridade = computed(() => calcularPorPrioridade(items.value))
 
   return {
     items,
@@ -188,6 +180,7 @@ export function useItems() {
     addItem,
     updateItem,
     deleteItem,
+    reservarItem,
     cancelarReserva,
     toggleComprado,
     metrics,
@@ -212,4 +205,57 @@ function sanitize(payload) {
     out[key] = value === '' ? null : value
   }
   return out
+}
+
+// --- Metricas (rodape da planilha, recalculado ao vivo) ----------------------
+//
+// Funcoes puras, e nao computeds sobre `items`, porque o painel precisa dos
+// mesmos numeros para DOIS conjuntos: a lista inteira e o recorte que o filtro
+// deixou na tela. Filtrar "Cozinha" e continuar lendo o preco da casa toda
+// obrigava a somar de cabeca.
+
+const somaEstimado = (lista) => lista.reduce((acc, i) => acc + num(i.preco_estimado), 0)
+
+export function calcularMetricas(lista) {
+  const comprados = lista.filter((i) => i.status === 'Comprado')
+  const aComprar = lista.filter((i) => i.status !== 'Comprado')
+
+  /**
+   * Item que um convidado ja chamou de seu. So conta o que ainda nao foi
+   * comprado: depois que entra em casa, quem pagou vira assunto de `jaGasto` e
+   * contar de novo aqui inflaria o "falta".
+   */
+  const reservadosPendentes = aComprar.filter((i) => (i.reservas?.length ?? 0) > 0)
+
+  const total = lista.length
+  const faltaGastar = somaEstimado(aComprar)
+  const reservado = somaEstimado(reservadosPendentes)
+
+  return {
+    totalGeral: somaEstimado(lista),
+    totalPessoal: somaEstimado(lista.filter((i) => i.tipo === 'Compra pessoal')),
+    totalChaPanela: somaEstimado(lista.filter((i) => i.tipo === 'Chá de Panela')),
+    jaGasto: comprados.reduce((acc, i) => acc + num(i.preco_real), 0),
+    faltaGastar,
+    /** Quanto os convidados ja assumiram. */
+    reservado,
+    itensReservados: reservadosPendentes.length,
+    /** O que sobra de fato para o casal — reservas descontadas. */
+    faltaEmAberto: faltaGastar - reservado,
+    comprados: comprados.length,
+    total,
+    progresso: total ? comprados.length / total : 0,
+  }
+}
+
+export function calcularPorPrioridade(lista) {
+  return Object.keys(PRIORIDADE_ORDEM).map((prioridade) => {
+    const doGrupo = lista.filter((i) => i.prioridade === prioridade)
+    return {
+      prioridade,
+      total: doGrupo.length,
+      comprados: doGrupo.filter((i) => i.status === 'Comprado').length,
+      estimado: somaEstimado(doGrupo),
+    }
+  })
 }

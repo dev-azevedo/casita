@@ -2,9 +2,11 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { X } from '@lucide/vue'
 import { formatTelefone, soDigitos } from '@/lib/format'
+import { codigoErroNome, codigoErroTelefone } from '@/lib/validacao'
 import { useConvidado } from '@/composables/useConvidado'
 import { useTecladoVirtual } from '@/composables/useTecladoVirtual'
 import Casinha from './Casinha.vue'
+import ComoEntregar from './ComoEntregar.vue'
 
 /**
  * Reservar um presente. Dois campos, nada mais — o convidado veio dar um
@@ -17,13 +19,20 @@ import Casinha from './Casinha.vue'
  * silencio deixa a pessoa na duvida se deu certo, e ela nao tem onde conferir
  * depois — nao existe conta de convidado.
  */
-defineProps({
+const props = defineProps({
   presente: { type: Object, required: true },
   salvando: { type: Boolean, default: false },
   erro: { type: String, default: '' },
   sucesso: { type: Boolean, default: false },
   /** Alguem reservou este item enquanto o modal estava aberto. */
   indisponivel: { type: Boolean, default: false },
+
+  /**
+   * Modo consulta: o item ja e de alguem e a pessoa so quer rever como entregar.
+   * Sem formulario, sem nome, sem telefone — mas COM o link da loja, que e o que
+   * responde de quanto fazer o pix. Por isso mora aqui, e nao no rodape da lista.
+   */
+  somenteEntrega: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['fechar', 'reservar'])
@@ -41,6 +50,7 @@ const lembrado = ref(false)
 const primeiroCampo = ref(null)
 const campoTelefone = ref(null)
 const botaoConfirmar = ref(null)
+const botaoFechar = ref(null)
 
 const digitos = computed(() => soDigitos(telefone.value))
 const primeiroNome = computed(() => nome.value.trim().split(/\s+/)[0] || '')
@@ -57,46 +67,22 @@ const primeiroNome = computed(() => nome.value.trim().split(/\s+/)[0] || '')
  */
 const tocado = ref({ nome: false, telefone: false })
 
-/**
- * Particulas de ligacao. Em "José da Silva" o sobrenome e "Silva", nao "da" —
- * sem esta lista, "Ana Da" passava como nome completo.
- */
-const PARTICULAS = new Set([
-  'da',
-  'das',
-  'de',
-  'del',
-  'des',
-  'di',
-  'do',
-  'dos',
-  'du',
-  'e',
-  'la',
-  'le',
-  'van',
-  'von',
-  'y',
-])
-
 const erroNome = computed(() => {
-  const partes = nome.value.trim().split(/\s+/).filter(Boolean)
-  if (!partes.length) return 'Escreve seu nome pra gente saber quem foi.'
-  // Duas palavras de verdade: 2+ letras e que nao sejam particula.
-  // A primeira posicao nunca e particula — "Van Gogh" comeca com nome, nao com
-  // ligacao. Errar para o lado de aceitar e melhor do que recusar nome real.
-  const proprias = partes.filter(
-    (p, i) => p.length >= 2 && (i === 0 || !PARTICULAS.has(p.toLowerCase())),
+  return (
+    {
+      VAZIO: 'Escreve seu nome pra gente saber quem foi.',
+      SEM_SOBRENOME: 'Coloca o sobrenome também.',
+    }[codigoErroNome(nome.value)] ?? ''
   )
-  if (proprias.length < 2) return 'Coloca o sobrenome também.'
-  return ''
 })
 
 const erroTelefone = computed(() => {
-  if (!digitos.value.length) return 'Precisamos do celular pra combinar a entrega.'
-  // 11 = DDD + o 9. Fixo nao recebe WhatsApp, e a entrega e combinada por la.
-  if (digitos.value.length !== 11) return 'Faltam dígitos: DDD + 9 números, 11 no total.'
-  return ''
+  return (
+    {
+      VAZIO: 'Precisamos do celular pra combinar a entrega.',
+      INCOMPLETO: 'Faltam dígitos: DDD + 9 números, 11 no total.',
+    }[codigoErroTelefone(digitos.value)] ?? ''
+  )
 })
 
 /** Mostrado agora? Só se o campo já foi tocado. */
@@ -146,6 +132,14 @@ onMounted(() => {
   document.addEventListener('keydown', aoTeclar)
   document.body.style.overflow = 'hidden'
 
+  if (props.somenteEntrega) {
+    botaoFechar.value?.focus()
+    return
+  }
+
+  // Pode vir so o telefone: quem respondeu a pergunta de abertura sem nunca ter
+  // reservado nada tem numero guardado e nenhum nome. Metade preenchida ja
+  // poupa metade da digitacao.
   const salvo = ler()
   if (salvo) {
     nome.value = salvo.nome
@@ -153,10 +147,12 @@ onMounted(() => {
     lembrado.value = true
   }
 
-  // Ja preenchido: foco no botao. Mandar a pessoa de volta a um campo que ela
-  // nao precisa tocar so faz parecer que tem trabalho a fazer.
-  if (lembrado.value) botaoConfirmar.value?.focus()
-  else primeiroCampo.value?.focus()
+  // Foco no primeiro campo que ainda pede alguma coisa. Mandar a pessoa de volta
+  // a um campo ja preenchido so faz parecer que tem trabalho a fazer; pular para
+  // o botao com o nome em branco esconderia o que falta.
+  if (!nome.value) primeiroCampo.value?.focus()
+  else if (!telefone.value) campoTelefone.value?.focus()
+  else botaoConfirmar.value?.focus()
 })
 
 onBeforeUnmount(() => {
@@ -197,14 +193,16 @@ const rodape =
     <div
       role="dialog"
       aria-modal="true"
-      :aria-label="`Reservar ${presente.item}`"
+      :aria-label="`${somenteEntrega ? 'Como entregar' : 'Reservar'} ${presente.item}`"
       class="flex max-h-full w-full flex-col rounded-t-3xl border-t border-line bg-surface-1 sm:max-w-md sm:rounded-3xl sm:border"
       style="animation: surgir 340ms cubic-bezier(0.16, 1, 0.3, 1)"
     >
       <div class="flex shrink-0 items-start justify-between gap-4 px-6 pt-5 pb-4">
         <div class="min-w-0">
           <p class="text-xs tracking-[0.2em] text-ink-faint uppercase">
-            {{ sucesso ? 'é seu' : indisponivel ? 'já foi' : 'reservar' }}
+            {{
+              somenteEntrega ? 'como entregar' : sucesso ? 'é seu' : indisponivel ? 'já foi' : 'reservar'
+            }}
           </p>
           <h2
             class="mt-1.5 font-[family-name:var(--font-display)] text-xl leading-tight font-semibold text-ink"
@@ -214,6 +212,7 @@ const rodape =
           </h2>
         </div>
         <button
+          ref="botaoFechar"
           type="button"
           aria-label="Fechar"
           class="-mr-2 grid size-10 shrink-0 place-items-center rounded-full text-ink-soft transition-colors hover:bg-surface-2"
@@ -223,12 +222,36 @@ const rodape =
         </button>
       </div>
 
+      <!-- ............................................. só entrega -->
+      <!-- Vem antes do `indisponivel`: o item esta reservado, sim, mas quem
+           chegou por aqui nao veio tentar reservar — veio rever como pagar. -->
+      <template v-if="somenteEntrega">
+        <div class="min-h-0 flex-1 overflow-y-auto px-6 pb-2">
+          <ComoEntregar
+            :link-produto="presente.link"
+            :nome-item="presente.item"
+            inicial="pix"
+          />
+          <div class="h-4" aria-hidden="true" />
+        </div>
+
+        <div :class="rodape">
+          <button
+            type="button"
+            class="min-h-12 w-full rounded-full bg-accent font-medium text-on-accent transition-colors hover:bg-accent-hover"
+            @click="emit('fechar')"
+          >
+            Voltar pra lista
+          </button>
+        </div>
+      </template>
+
       <!-- ............................................. formulário -->
       <!-- `min-h-0` é o que permite o corpo encolher: sem ele, o mínimo
            automático do flex impede a rolagem interna e o rodapé é empurrado
            para fora da tela — de volta ao problema. -->
       <form
-        v-if="!sucesso && !indisponivel"
+        v-else-if="!sucesso && !indisponivel"
         class="flex min-h-0 flex-1 flex-col"
         @submit.prevent="enviar"
       >
@@ -291,6 +314,13 @@ const rodape =
           >
             não é você? limpar
           </button>
+
+          <ComoEntregar
+            lembrete-reserva
+            :link-produto="presente.link"
+            :nome-item="presente.item"
+            class="mt-6 border-t border-line-soft pt-5"
+          />
 
           <div class="h-4" aria-hidden="true" />
         </div>
@@ -357,6 +387,12 @@ const rodape =
           <p class="mt-5 text-lg font-medium text-ink">Guardado com a gente.</p>
           <p class="mx-auto mt-1.5 max-w-[32ch] text-sm text-ink-soft">
             Obrigado, {{ primeiroNome }}. A gente chama no seu celular pra combinar a entrega.
+          </p>
+          <!-- Aqui o bloco nao se repete: a pessoa acabou de ve-lo e o modal
+               ficaria alto demais. So diz onde ele passou a morar. -->
+          <p class="mx-auto mt-4 max-w-[32ch] text-sm text-ink-soft">
+            O pix e o endereço ficam no fim da lista, em
+            <span class="font-medium text-ink">como entregar</span>.
           </p>
         </div>
 

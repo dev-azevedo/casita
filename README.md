@@ -305,6 +305,33 @@ A garantia mora em `supabase/reservas.sql`:
 - **`reservar_presente()`** é `security definer` e é a única porta de escrita do anônimo.
   Ela normaliza (trim no nome, só dígitos no telefone), valida, confere que o item ainda
   é `Chá de Panela` + `A comprar`, e insere.
+
+### "Quais reservas são minhas?"
+
+O convidado que reservava num aparelho e abria a lista em outro perdia o rastro do que já
+era seu — a memória vivia só no `localStorage`. Duas funções `security definer` resolvem
+isso sem abrir a tabela:
+
+O celular também é guardado quando o número **não** tem reserva nenhuma — esse é o caso
+comum, de quem ainda vai escolher. Não há aviso de "não encontrei": a pergunta fecha, a
+lista aparece, e o número reaparece pronto no formulário da primeira reserva. Nome só é
+gravado depois de uma reserva confirmada, então `useConvidado.ler()` aceita identidade só
+com telefone.
+
+- **`minhas_reservas(telefone)`** devolve só as linhas cujo telefone bate **exatamente**
+  (11 dígitos, sem `like`, sem busca parcial), e só de itens que estão na lista pública.
+  Telefone inválido e telefone sem reserva dão a **mesma** resposta vazia, de propósito: a
+  função não pode virar um detector de "esse celular reservou algo?".
+- **`cancelar_reserva(item_id, telefone)`** deixa o convidado soltar o próprio presente. A
+  autorização é a própria cláusula do `delete` (`r.telefone = v_tel`): telefone errado casa
+  zero linhas e a função levanta `RESERVA_NAO_ENCONTRADA`. Não existe argumento que apague
+  reserva alheia.
+
+**O telefone é a credencial, e ela é fraca de propósito.** Quem já tem o celular de um
+convidado descobre o que ele reservou e pode soltar o item. O que está em jogo é uma lista
+de presentes de chá de casa nova; pedir senha para dar presente custaria mais do que
+protege. Se um dia isso incomodar, o caminho é limitar a taxa de chamadas da função — não
+adicionar cadastro.
 - Reserva dupla é impedida pelo **índice único** `reservas_item_unico`, não por um
   `if not exists` no app: duas abas clicando no mesmo segundo perdem essa corrida.
   Quem chega depois recebe `JA_RESERVADO` e vê "Alguém reservou esse item agora mesmo".
@@ -315,6 +342,9 @@ O teste que vale, numa janela anônima com o app aberto:
 await supabase.from('items').select('*')               // []  (RLS)
 await supabase.from('reservas').select('*')            // []  (sem policy para anon)
 await supabase.from('presentes_publicos').select('*')  // a lista, sem nenhum preço
+
+// A única leitura de reserva que o anônimo tem — e só do próprio número:
+await supabase.rpc('minhas_reservas', { p_telefone: '11988887777' })
 ```
 
 ### As duas listas se atualizam sozinhas
@@ -515,7 +545,7 @@ src/
 ├── style.css            tokens de cor/tipo/movimento, tema escuro, keyframes
 ├── lib/
 │   ├── supabase.js      cliente
-│   ├── format.js        formatBRL / parseBRL / formatTelefone / linkWhatsApp
+│   ├── format.js        formatBRL / parseBRL / formatTelefone / telefoneCanonico
 │   ├── constants.js     categorias, prioridades, disponibilidade
 │   ├── theme.js         <- as 19 cores da casa
 │   └── fotos.js         <- edite aqui para trocar fotos e textos da capa
@@ -525,6 +555,7 @@ src/
 │   ├── usePresentes.js  lista pública + reservar  (nunca fala com `items`)
 │   ├── useAutoRefresh.js  repete uma busca a cada 5s; pausa com a aba escondida
 │   ├── useConvidado.js  nome/celular de quem já reservou, no aparelho
+│   ├── useMinhasReservas.js  as reservas deste celular, em qualquer navegador
 │   ├── useTecladoVirtual.js  viewport visual em CSS vars, p/ modais com teclado
 │   ├── useConfig.js     cor da casa + mostrar fotos, vindos do banco
 │   ├── useFotos.js      quais fotos aparecem agora (dev + interruptor)
@@ -552,11 +583,14 @@ src/
     ├── ItemFormModal.vue
     ├── PresenteFaixa.vue  uma linha da lista pública
     ├── ReservaModal.vue   nome + celular, e a comemoração
+    ├── IdentificarModal.vue  o celular de quem chegou: marca o que é seu e adianta a reserva
+    ├── DesfazerReserva.vue   o convidado soltando o próprio presente
     └── ConfirmarCancelamentoReserva.vue
 
 supabase/
 ├── schema.sql          tabela items, RLS
-├── reservas.sql        reservas, view pública, reservar_presente()
+├── reservas.sql        reservas, view pública, reservar_presente(),
+│                    minhas_reservas(), cancelar_reserva()
 └── configuracoes.sql   cor da casa + mostrar fotos (linha única)
 ```
 

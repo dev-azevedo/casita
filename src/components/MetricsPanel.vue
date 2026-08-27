@@ -4,10 +4,21 @@ import { formatBRL, formatPercent } from '@/lib/format'
 import Casinha from './Casinha.vue'
 import MarcaPrioridade from './MarcaPrioridade.vue'
 
+/**
+ * Os numeros seguem o que esta na tela. Com filtro aplicado eles descrevem o
+ * RECORTE, nao a casa — e e por isso que `filtrado` existe: "R$ 1.240 falta
+ * gastar" lido como total da casa e pior do que numero nenhum.
+ */
 const props = defineProps({
   metrics: { type: Object, required: true },
   porPrioridade: { type: Array, required: true },
+  /** Ha filtro valendo: os numeros sao de um pedaco da lista. */
+  filtrado: { type: Boolean, default: false },
+  /** Tamanho da lista inteira, para dizer de quanto e o pedaco. */
+  totalItens: { type: Number, default: 0 },
 })
+
+defineEmits(['limpar'])
 
 const pct = computed(() => Math.min(100, Math.max(0, props.metrics.progresso * 100)))
 </script>
@@ -16,8 +27,31 @@ const pct = computed(() => Math.min(100, Math.max(0, props.metrics.progresso * 1
   <section aria-label="Resumo">
     <!-- Número herói: um só, grande. Não seis cards iguais. -->
     <div class="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
-      <div>
-        <p class="text-xs tracking-[0.2em] text-ink-faint uppercase">Falta gastar</p>
+      <div class="min-w-0">
+        <!-- A marca do recorte vive na sobrancelha, nao num selo ao lado: ela
+             qualifica o numero de baixo, e e junto dele que precisa ser lida. -->
+        <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p
+            class="text-xs tracking-[0.2em] uppercase transition-colors duration-300"
+            :class="filtrado ? 'text-accent' : 'text-ink-faint'"
+          >
+            Falta gastar
+            <template v-if="filtrado">
+              · recorte de
+              <span class="tnum">{{ metrics.total }}</span> de
+              <span class="tnum">{{ totalItens }}</span>
+              {{ totalItens === 1 ? 'item' : 'itens' }}
+            </template>
+          </p>
+          <button
+            v-if="filtrado"
+            type="button"
+            class="min-h-9 text-xs text-ink-faint underline underline-offset-4 transition-colors hover:text-ink"
+            @click="$emit('limpar')"
+          >
+            ver a casa inteira
+          </button>
+        </div>
         <p
           class="tnum mt-2 text-2xl font-semibold text-ink"
           style="font-variation-settings: 'SOFT' 70, 'WONK' 1, 'opsz' 144"

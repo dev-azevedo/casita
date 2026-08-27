@@ -40,6 +40,19 @@ export function soDigitos(value) {
 }
 
 /**
+ * Telefone do jeito que o banco guarda: DDD + numero, sem o 55 na frente.
+ *
+ * Existe porque o telefone virou CHAVE DE COMPARACAO no "quais reservas sao
+ * minhas" — e ali "+55 11 98888-7777" colado do WhatsApp nao pode virar um
+ * numero diferente do 11988887777 que a pessoa digitou na hora de reservar.
+ * Para exibir, soDigitos basta; para comparar, use esta.
+ */
+export function telefoneCanonico(value) {
+  const d = soDigitos(value)
+  return d.length === 13 && d.startsWith('55') ? d.slice(2) : d
+}
+
+/**
  * Telefone e guardado so em digitos (o banco exige ^[0-9]{10,11}$ e o link do
  * wa.me nao aceita pontuacao). A mascara existe so para ler.
  *
@@ -65,8 +78,14 @@ export function formatData(iso) {
   return Number.isNaN(d.getTime()) ? '' : data.format(d)
 }
 
-/** Numero brasileiro para o formato que o wa.me espera (55 + DDD + numero). */
-export function linkWhatsApp(telefone) {
+/**
+ * Numero brasileiro para o formato que o wa.me espera (55 + DDD + numero).
+ *
+ * O `texto` e opcional e abre a conversa com a mensagem ja escrita — quem chega
+ * pelo link nao precisa formular nada. Sem ele, o comportamento e o de antes.
+ */
+export function linkWhatsApp(telefone, texto = '') {
   const d = soDigitos(telefone)
-  return d ? `https://wa.me/55${d}` : null
+  if (!d) return null
+  return `https://wa.me/55${d}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`
 }

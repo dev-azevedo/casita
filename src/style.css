@@ -58,36 +58,41 @@
 /* Escuro nao e claro invertido: profundidade vem de superficie mais clara (sem
    sombra) e o accent perde chroma para nao vibrar. */
 [data-theme='escuro'] {
-  /* Carvao, nao breu: preto puro cansa a vista e nao existe na natureza. */
-  --surface-0: oklch(23% 0.014 var(--h));
-  --surface-1: oklch(27% 0.016 var(--h));
-  --surface-2: oklch(32% 0.019 var(--h));
-  --line-soft: oklch(31% 0.018 var(--h));
-  --line: oklch(38% 0.02 var(--h));
-  --line-strong: oklch(58% 0.022 var(--h));
+  /* Cinza-chumbo, nao carvao. A rampa subiu ~4 pontos de clareza: o fundo antigo
+     (23%) lia como preto em tela de celular no escuro, e preto puro nao existe
+     na natureza — cansa a vista e apaga a hierarquia entre as superficies.
+     Subir o fundo obriga a subir tudo o que se apoia nele: as bordas somem se
+     ficarem paradas, e o --ink-faint perde o 4.5:1 do texto pequeno. */
+  --surface-0: oklch(27% 0.014 var(--h));
+  --surface-1: oklch(31% 0.016 var(--h));
+  --surface-2: oklch(36% 0.019 var(--h));
+  --line-soft: oklch(35% 0.018 var(--h));
+  --line: oklch(42% 0.02 var(--h));
+  --line-strong: oklch(62% 0.022 var(--h));
 
   --ink: oklch(95% 0.012 var(--h));
-  --ink-soft: oklch(79% 0.015 var(--h));
-  --ink-faint: oklch(70% 0.015 var(--h));
+  --ink-soft: oklch(81% 0.015 var(--h));
+  --ink-faint: oklch(73% 0.015 var(--h));
 
   --accent: oklch(74% calc(var(--c) * 0.85) var(--h));
   --accent-hover: oklch(80% calc(var(--c) * 0.75) var(--h));
-  --accent-soft: oklch(36% calc(var(--c) * 0.4) var(--h));
-  --accent-ink: oklch(85% calc(var(--c) * 0.35) var(--h));
+  --accent-soft: oklch(40% calc(var(--c) * 0.4) var(--h));
+  --accent-ink: oklch(86% calc(var(--c) * 0.35) var(--h));
   --on-accent: oklch(22% 0.025 var(--h));
 
-  --danger: oklch(75% 0.14 27);
-  --danger-soft: oklch(34% 0.06 27);
+  --danger: oklch(78% 0.14 27);
+  --danger-soft: oklch(38% 0.06 27);
 
   --p-essencial: oklch(64% 0.17 22);
   --p-importante: oklch(86% 0.15 88);
   --p-desejavel: oklch(74% 0.08 228);
 
-  --scrim: oklch(14% 0.02 var(--h) / 0.68);
+  /* O veu tem de continuar escurecendo um fundo que agora e mais claro. */
+  --scrim: oklch(17% 0.02 var(--h) / 0.72);
 
   --elev-1: none;
   --elev-2: none;
-  --elev-3: 0 16px 48px oklch(8% 0.02 var(--h) / 0.5);
+  --elev-3: 0 16px 48px oklch(10% 0.02 var(--h) / 0.55);
 }
 
 /* ---------------------------------------------------------------------------
@@ -187,8 +192,32 @@ h3 {
   border-radius: 4px;
 }
 
-/* iOS da zoom ao focar input com fonte < 16px */
+/* Tailwind v4 devolveu `cursor: default` ao botao, seguindo o navegador. Numa
+   tela onde metade das coisas e clicavel e quase nada parece botao (pergunta
+   recolhivel, link de texto, pilula), a mao e o unico aviso antes do clique. */
+button:not(:disabled),
+summary,
+[role='button']:not([aria-disabled='true']) {
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+   ESCALA NO CELULAR
+   Um degrau acima nos tamanhos de apoio. Na mao, a 30cm do olho e com metade da
+   tela coberta pelo polegar, 12px vira ruido — e esta e uma lista que se le
+   inteira no celular, nao um painel de trabalho.
+
+   Sobe o tamanho, nao o espacamento: os `line-height` do Tailwind sao razoes,
+   entao a entrelinha acompanha sozinha e o ritmo vertical nao quebra.
+--------------------------------------------------------------------------- */
 @media (max-width: 640px) {
+  :root {
+    --text-xs: 0.8125rem; /* 13px */
+    --text-sm: 0.9375rem; /* 15px */
+    --text-base: 1.0625rem; /* 17px */
+  }
+
+  /* iOS da zoom ao focar input com fonte < 16px */
   input,
   select,
   textarea {

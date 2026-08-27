@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { ArrowUpRight, Check } from '@lucide/vue'
+import { formatTelefone } from '@/lib/format'
 import MarcaPrioridade from './MarcaPrioridade.vue'
 
 /**
@@ -13,9 +14,18 @@ import MarcaPrioridade from './MarcaPrioridade.vue'
  */
 const props = defineProps({
   presente: { type: Object, required: true },
+
+  /**
+   * A reserva DESTE presente, quando ela e de quem esta olhando — { nome,
+   * telefone, created_at }, vindo de minhas_reservas(). Null em todo o resto da
+   * lista, inclusive nos itens reservados por outra pessoa: a view publica nem
+   * traz esses campos, e o unico jeito de eles chegarem aqui e o convidado ter
+   * provado o telefone.
+   */
+  minhaReserva: { type: Object, default: null },
 })
 
-defineEmits(['reservar'])
+defineEmits(['reservar', 'comoEntregar', 'desfazer'])
 
 const temLink = computed(() => !!props.presente.link)
 </script>
@@ -25,7 +35,7 @@ const temLink = computed(() => !!props.presente.link)
     class="group relative border-b border-line-soft transition-colors last:border-b-0"
     :class="presente.reservado ? '' : 'hover:bg-surface-1'"
   >
-    <div class="flex items-start gap-4 py-5 pr-1 pl-1 sm:gap-6">
+    <div class="flex flex-col gap-3 py-5 pr-1 pl-1 sm:flex-row sm:items-start sm:gap-6">
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <MarcaPrioridade :prioridade="presente.prioridade" :tamanho="11" />
@@ -63,19 +73,58 @@ const temLink = computed(() => !!props.presente.link)
           {{ presente.observacoes }}
         </p>
 
-        <a
-          v-if="temLink"
-          :href="presente.link"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="mt-2 inline-flex min-h-9 items-center text-sm font-medium text-accent underline decoration-1 underline-offset-4 transition-opacity hover:opacity-70"
+        <!-- Quem reservou, mostrado SO para quem reservou. A pergunta que abre a
+             lista existe por causa desta linha: sem ela, trocar de navegador
+             apagava a memoria do que ja era seu. -->
+        <p v-if="minhaReserva" class="mt-2 text-sm text-accent-ink">
+          {{ minhaReserva.nome }}
+          <span class="tnum text-ink-soft"> · {{ formatTelefone(minhaReserva.telefone) }}</span>
+        </p>
+
+        <!-- Uma linha so: no celular os dois quebram juntos em vez de empilhar
+             com espacamentos diferentes. -->
+        <div
+          v-if="temLink || presente.reservado"
+          class="mt-2 flex flex-wrap items-center gap-x-4"
         >
-          ver na loja
-        </a>
+          <a
+            v-if="temLink"
+            :href="presente.link"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex min-h-9 items-center text-sm font-medium text-accent underline decoration-1 underline-offset-4 transition-opacity hover:opacity-70"
+          >
+            ver na loja
+          </a>
+
+          <!-- Reservado, o presente perde o botao e ficava sem saida nenhuma:
+               este e o caminho de volta pro pix e pro endereco. -->
+          <button
+            v-if="presente.reservado"
+            type="button"
+            class="inline-flex min-h-9 items-center text-sm font-medium text-accent-ink underline decoration-1 underline-offset-4 transition-opacity hover:opacity-70"
+            @click="$emit('comoEntregar', presente)"
+          >
+            como entregar
+          </button>
+
+          <!-- Discreto de proposito: desistir e raro e destrutivo, nao pode
+               competir de igual pra igual com "como entregar". -->
+          <button
+            v-if="minhaReserva"
+            type="button"
+            class="inline-flex min-h-9 items-center text-sm text-ink-faint underline decoration-1 underline-offset-4 transition-colors hover:text-danger"
+            @click="$emit('desfazer', presente)"
+          >
+            desfazer reserva
+          </button>
+        </div>
       </div>
 
-      <!-- Reservar / reservado: alvo de toque cheio, alinhado ao topo da faixa -->
-      <div class="shrink-0 pt-0.5">
+      <!-- Reservar / reservado: rodape da faixa no celular, coluna propria no
+           desktop. Largura automatica, nao cheia: numa lista de 40 presentes,
+           40 barras de accent empilhadas viram parede, nao chamada. -->
+      <div class="flex sm:shrink-0 sm:pt-0.5">
         <button
           v-if="!presente.reservado"
           type="button"
@@ -85,12 +134,16 @@ const temLink = computed(() => !!props.presente.link)
           Reservar
         </button>
 
+        <!-- Mesmo selo, palavra diferente: "reservado" e um aviso de que o item
+             saiu; "sua reserva" e um reconhecimento. So muda para quem provou o
+             telefone. -->
         <span
           v-else
           class="flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-medium text-accent-ink"
+          :class="minhaReserva ? 'ring-1 ring-accent' : ''"
         >
           <Check :size="15" :stroke-width="2.6" />
-          reservado
+          {{ minhaReserva ? 'sua reserva' : 'reservado' }}
         </span>
       </div>
     </div>

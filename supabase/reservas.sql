@@ -172,3 +172,110 @@ notify pgrst, 'reload schema';
 --   supabase.from('items').select('*')     -> [] (RLS)
 --   supabase.from('reservas').select('*')  -> [] (sem policy para anon)
 --   supabase.from('presentes_publicos').select('*') -> lista, sem nenhum preco
+
+-- ---------------------------------------------------------------------------
+-- "QUAIS SAO AS MINHAS?"
+--
+-- O convidado nao tem conta. Ate aqui, quem reservou algo so era lembrado no
+-- proprio navegador (localStorage, src/composables/useConvidado.js): trocou de
+-- aparelho, perdeu o rastro do que ja tinha escolhido — e nao tinha como
+-- desfazer sem falar com o casal.
+--
+-- A tabela `reservas` continua fechada para `anon` (bloco de RLS la em cima) e
+-- a view publica continua devolvendo so o booleano. O que muda e que existem
+-- duas portas novas, `security definer`, e as duas exigem O TELEFONE EXATO como
+-- credencial. Sem `like`, sem busca parcial, sem listagem: ou a pessoa digita os
+-- 11 digitos daquela reserva, ou nao ve nada.
+--
+-- E uma credencial fraca, e isso foi decidido de olho aberto: quem ja tem o
+-- celular de um convidado descobre o que ele reservou e pode soltar o item.
+-- O que esta em jogo e uma lista de presentes, e o custo da alternativa (pedir
+-- senha para dar presente) e alto demais para o que protege.
+-- ---------------------------------------------------------------------------
+create or replace function public.minhas_reservas(p_telefone text)
+returns table (
+  item_id    uuid,
+  nome       text,
+  telefone   text,
+  created_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  -- Telefone invalido cai no filtro e sai lista vazia, nao excecao: resposta
+  -- vazia para numero errado e para numero que nao existe tem que ser a MESMA,
+  -- senao a funcao vira um detector de "esse celular reservou algo?".
+  select r.item_id, r.nome, r.telefone, r.created_at
+    from public.reservas r
+    join public.items i on i.id = r.item_id
+   where regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g') ~ '^[0-9]{11}$'
+     and r.telefone = regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g')
+     -- Mesmo filtro da view. Sem ele, esta funcao seria uma janela para itens
+     -- que o convidado nunca deveria enxergar.
+     and i.tipo = 'Chá de Panela'
+     and i.status = 'A comprar';
+$$;
+
+-- ---------------------------------------------------------------------------
+-- DESFAZER A PROPRIA RESERVA
+--
+-- A autorizacao e a propria clausula do delete: `r.telefone = v_tel`. Telefone
+-- errado casa zero linhas e a funcao levanta RESERVA_NAO_ENCONTRADA — nao ha
+-- caminho, com nenhum argumento, para apagar a reserva de outra pessoa.
+--
+-- Apaga a linha em vez de marcar cancelada. E a mesma coisa que o painel ja faz
+-- (useItems.cancelarReserva) e o indice unico por item depende disso: reserva
+-- cancelada que continuasse na tabela impediria o proximo convidado de reservar.
+-- ---------------------------------------------------------------------------
+create or replace function public.cancelar_reserva(
+  p_item_id  uuid,
+  p_telefone text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_tel      text := regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g');
+  v_apagadas int;
+begin
+  if v_tel !~ '^[0-9]{11}$' then
+    raise exception 'TELEFONE_INVALIDO';
+  end if;
+
+  delete from public.reservas r
+   using public.items i
+   where r.item_id = p_item_id
+     and i.id = r.item_id
+     and r.telefone = v_tel
+     and i.tipo = 'Chá de Panela'
+     and i.status = 'A comprar';
+
+  get diagnostics v_apagadas = row_count;
+
+  -- Zero linhas cobre tudo de uma vez: telefone de outro, item que ja saiu da
+  -- lista, reserva que o casal cancelou antes. Do lado de fora e a mesma frase
+  -- ("essa reserva nao e mais sua, atualiza a pagina") e nenhuma delas confirma
+  -- a existencia de reserva alheia.
+  if v_apagadas = 0 then
+    raise exception 'RESERVA_NAO_ENCONTRADA';
+  end if;
+end;
+$$;
+
+revoke all on function public.minhas_reservas(text) from public;
+grant execute on function public.minhas_reservas(text) to anon, authenticated;
+
+revoke all on function public.cancelar_reserva(uuid, text) from public;
+grant execute on function public.cancelar_reserva(uuid, text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- Conferencia das duas funcoes novas (SQL Editor):
+--   select * from public.minhas_reservas('11988887777');  -- as reservas do numero
+--   select * from public.minhas_reservas('119888');       -- vazio, sem erro
+--   select * from public.minhas_reservas('11900000000');  -- vazio
+--   select public.cancelar_reserva('<item_id>', '00000000000');
+--     -> RESERVA_NAO_ENCONTRADA, mesmo que o item tenha reserva de outro numero

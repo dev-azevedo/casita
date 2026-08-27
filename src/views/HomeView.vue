@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { Plus, Rose} from '@lucide/vue'
 
 import { useAuth } from '@/composables/useAuth'
-import { useItems } from '@/composables/useItems'
+import { useItems, calcularMetricas, calcularPorPrioridade } from '@/composables/useItems'
 import { useOnboarding } from '@/composables/useOnboarding'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useConfig } from '@/composables/useConfig'
@@ -21,6 +21,7 @@ import ItemList from '@/components/ItemList.vue'
 import ItemFormModal from '@/components/ItemFormModal.vue'
 import ConfirmarExclusao from '@/components/ConfirmarExclusao.vue'
 import ConfirmarCancelamentoReserva from '@/components/ConfirmarCancelamentoReserva.vue'
+import ReservarPorAdmin from '@/components/ReservarPorAdmin.vue'
 import WelcomeTour from '@/components/WelcomeTour.vue'
 import Casinha from '@/components/Casinha.vue'
 
@@ -34,10 +35,12 @@ const {
   addItem,
   updateItem,
   deleteItem,
+  reservarItem,
   cancelarReserva,
   toggleComprado,
+  // Global de propósito: é o que o tour de boas-vindas apresenta. Os números do
+  // resumo saem de `metricasVisiveis`, que segue o filtro.
   metrics,
-  porPrioridade,
 } = useItems()
 const { visivel: tourVisivel, verificar, concluir, reabrir } = useOnboarding()
 const { fetchConfig } = useConfig()
@@ -57,6 +60,9 @@ const excluindo = ref(false)
 /** { item, reserva } — o dialogo mostra os dois. */
 const reservaParaCancelar = ref(null)
 const cancelandoReserva = ref(false)
+const itemParaReservar = ref(null)
+const reservando = ref(false)
+const erroReserva = ref('')
 
 onMounted(() => {
   fetchItems()
@@ -72,20 +78,35 @@ const temFiltro = computed(() =>
   Object.values(filtros.value).some((v) => v !== ''),
 )
 
-const itensFiltrados = computed(() => {
-  const busca = filtros.value.busca.trim().toLowerCase()
-  return items.value.filter((i) => {
-    if (filtros.value.categoria && i.categoria !== filtros.value.categoria) return false
-    if (filtros.value.prioridade && i.prioridade !== filtros.value.prioridade) return false
-    if (filtros.value.status && i.status !== filtros.value.status) return false
-    if (filtros.value.tipo && i.tipo !== filtros.value.tipo) return false
-    if (busca) {
-      const alvo = `${i.item} ${i.categoria} ${i.observacoes ?? ''}`.toLowerCase()
-      if (!alvo.includes(busca)) return false
-    }
-    return true
-  })
-})
+/**
+ * Funcao solta, e nao so o corpo do computed, porque o painel de filtros
+ * precisa da mesma regra para dizer quantos itens o rascunho deixaria — sem
+ * isso o botao "Ver N itens" contaria diferente do que a lista mostra.
+ */
+function combina(item, f) {
+  if (f.categoria && item.categoria !== f.categoria) return false
+  if (f.prioridade && item.prioridade !== f.prioridade) return false
+  if (f.status && item.status !== f.status) return false
+  if (f.tipo && item.tipo !== f.tipo) return false
+  const busca = f.busca.trim().toLowerCase()
+  if (busca) {
+    const alvo = `${item.item} ${item.categoria} ${item.observacoes ?? ''}`.toLowerCase()
+    if (!alvo.includes(busca)) return false
+  }
+  return true
+}
+
+const itensFiltrados = computed(() => items.value.filter((i) => combina(i, filtros.value)))
+
+const contarComFiltro = (f) => items.value.filter((i) => combina(i, f)).length
+
+/**
+ * Os totalizadores seguem o recorte, nao a lista inteira: com "Cozinha"
+ * aplicado, "falta gastar" e o que falta na cozinha. `metrics` (global)
+ * continua existindo para o tour de boas-vindas, que apresenta a casa toda.
+ */
+const metricasVisiveis = computed(() => calcularMetricas(itensFiltrados.value))
+const prioridadesVisiveis = computed(() => calcularPorPrioridade(itensFiltrados.value))
 
 function limparFiltros() {
   filtros.value = vazios()
@@ -150,6 +171,26 @@ function mostrarAviso(msg) {
   avisoTimer = setTimeout(() => (aviso.value = ''), 4500)
 }
 
+function pedirReserva(item) {
+  erroReserva.value = ''
+  itemParaReservar.value = item
+}
+
+async function confirmarReserva({ nome, telefone }) {
+  const item = itemParaReservar.value
+  reservando.value = true
+  erroReserva.value = ''
+  try {
+    await reservarItem(item.id, nome, telefone)
+    itemParaReservar.value = null
+    mostrarAviso(`"${item.item}" agora é de ${nome}.`)
+  } catch (e) {
+    erroReserva.value = e.message
+  } finally {
+    reservando.value = false
+  }
+}
+
 async function confirmarCancelamentoReserva() {
   const { reserva } = reservaParaCancelar.value
   cancelandoReserva.value = true
@@ -200,14 +241,19 @@ async function sair() {
       </div>
 
       <template v-else>
-        <MetricsPanel :metrics="metrics" :por-prioridade="porPrioridade" />
+        <MetricsPanel
+          :metrics="metricasVisiveis"
+          :por-prioridade="prioridadesVisiveis"
+          :filtrado="temFiltro"
+          :total-itens="items.length"
+          @limpar="limparFiltros"
+        />
 
         <div class="mt-14">
-          <ItemFilters v-model="filtros" />
-
-          <p class="tnum mt-4 text-sm text-ink-faint">
-            {{ itensFiltrados.length }} de {{ items.length }} itens
-          </p>
+          <!-- A contagem que ficava aqui embaixo migrou para a sobrancelha do
+               resumo: lá ela explica de onde vêm os números, e sem filtro ela
+               não precisa existir. -->
+          <ItemFilters v-model="filtros" :contar="contarComFiltro" />
 
           <div class="mt-6">
             <ItemList
@@ -217,6 +263,7 @@ async function sair() {
               @edit="abrirEdicao"
               @remove="pedirExclusao"
               @limpar="limparFiltros"
+              @reservar="pedirReserva"
               @cancelar-reserva="reservaParaCancelar = $event"
             />
           </div>
@@ -264,6 +311,15 @@ async function sair() {
       :excluindo="excluindo"
       @cancelar="itemParaExcluir = null"
       @confirmar="confirmarExclusao"
+    />
+
+    <ReservarPorAdmin
+      v-if="itemParaReservar"
+      :item="itemParaReservar"
+      :salvando="reservando"
+      :erro="erroReserva"
+      @fechar="itemParaReservar = null"
+      @reservar="confirmarReserva"
     />
 
     <ConfirmarCancelamentoReserva

@@ -70,6 +70,11 @@ export const CHAVES = {
   // { nome, telefone } de quem ja reservou algo neste aparelho, para nao pedir
   // duas vezes. Telefone so em digitos.
   convidado: 'casita:convidado:v1',
+  // "Ainda nao reservei" — a pergunta de identificacao abre sozinha na primeira
+  // visita, e quem disse que nao tem reserva nao pode ser interrogado de novo a
+  // cada carregamento. Chave propria, e nao um campo dentro de `convidado`,
+  // porque aquele objeto so vale inteiro (nome E telefone).
+  identificacaoDispensada: 'casita:identificacao-dispensada:v1',
   // Espelho de public.configuracoes: { cor, mostrarFotos }. Serve para a tela
   // abrir no ultimo estado conhecido em vez de piscar o padrao a cada visita.
   config: 'casita:config:v1',

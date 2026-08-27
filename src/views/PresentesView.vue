@@ -6,9 +6,10 @@ import { ArrowLeft } from '@lucide/vue'
 import { usePresentes } from '@/composables/usePresentes'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useConvidado } from '@/composables/useConvidado'
+import { useMinhasReservas } from '@/composables/useMinhasReservas'
 import { useConfig } from '@/composables/useConfig'
 import { CATEGORIAS, PRIORIDADES, DISPONIBILIDADE } from '@/lib/constants'
-import { formatPercent } from '@/lib/format'
+import { formatPercent, formatTelefone } from '@/lib/format'
 
 import MarcaCasita from '@/components/MarcaCasita.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -16,6 +17,9 @@ import Casinha from '@/components/Casinha.vue'
 import ItemFilters from '@/components/ItemFilters.vue'
 import PresenteFaixa from '@/components/PresenteFaixa.vue'
 import ReservaModal from '@/components/ReservaModal.vue'
+import IdentificarModal from '@/components/IdentificarModal.vue'
+import DesfazerReserva from '@/components/DesfazerReserva.vue'
+import ComoEntregar from '@/components/ComoEntregar.vue'
 
 /**
  * A lista que os convidados recebem por link. Sem login, sem cadastro.
@@ -37,10 +41,39 @@ const GRUPOS = [
   { chave: 'disponibilidade', rotulo: 'Disponibilidade', opcoes: DISPONIBILIDADE },
 ]
 
-const { salvar: salvarConvidado } = useConvidado()
+const { salvar: salvarConvidado, dispensar, foiDispensado } = useConvidado()
 const { fetchConfig } = useConfig()
 
+/**
+ * Identificacao do convidado. Sem isto, quem reservava num aparelho e abria a
+ * lista em outro nao tinha como saber o que ja era seu — a lista publica so diz
+ * que o item saiu, nunca para quem.
+ */
+const {
+  minhas,
+  carregando: identificando,
+  identificado,
+  quantas,
+  telefone: meuTelefone,
+  identificar,
+  recarregar: recarregarMinhas,
+  esquecer,
+  cancelar: cancelarMinha,
+  registrarLocal,
+  restaurar,
+} = useMinhasReservas()
+
+const mostrarIdentificar = ref(false)
+/** Foi a tela que abriu a pergunta, nao a pessoa — muda o que "fechar" significa. */
+const perguntaAutomatica = ref(false)
+
+const paraDesfazer = ref(null)
+const desfazendo = ref(false)
+const erroDesfazer = ref('')
+
 const escolhido = ref(null)
+/** Modal aberto so para consulta: item de outra pessoa, sem formulario. */
+const modoEntrega = ref(false)
 const salvando = ref(false)
 const erroReserva = ref('')
 const sucesso = ref(false)
@@ -61,16 +94,30 @@ const escolhidoAtual = computed(() =>
  * comemoracao viraria "acabou de ser reservado" no frame seguinte.
  */
 const indisponivel = computed(
-  () => !sucesso.value && !!escolhidoAtual.value?.reservado,
+  () => !modoEntrega.value && !sucesso.value && !!escolhidoAtual.value?.reservado,
 )
 
-onMounted(fetchPresentes)
+onMounted(async () => {
+  fetchPresentes()
+  // Quem já reservou neste aparelho não é perguntado: o telefone guardado vale
+  // como resposta. A pergunta é para o navegador novo — que é justamente onde a
+  // memória local não existe.
+  const reconhecido = await restaurar()
+  if (!reconhecido && !foiDispensado()) {
+    perguntaAutomatica.value = true
+    mostrarIdentificar.value = true
+  }
+})
 
 // A lista anda sozinha: numa festa, dois convidados olhando a mesma tela
 // precisam ver o item sair. `silencioso` evita piscar o carregamento.
 // A config vem junto: se o casal trocar a cor da casa, quem está com a lista
 // aberta vê a mudança sem recarregar.
-useAutoRefresh(() => Promise.all([fetchPresentes({ silencioso: true }), fetchConfig()]))
+// As reservas próprias andam no mesmo ciclo: o casal pode cancelar uma pelo
+// painel, e o selo "sua reserva" não pode sobreviver a isso.
+useAutoRefresh(() =>
+  Promise.all([fetchPresentes({ silencioso: true }), fetchConfig(), recarregarMinhas()]),
+)
 
 const temFiltro = computed(() => Object.values(filtros.value).some((v) => v !== ''))
 
@@ -86,21 +133,32 @@ const semAcento = (s) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 
-const filtrados = computed(() => {
-  const busca = semAcento(filtros.value.busca.trim())
-  return presentes.value.filter((p) => {
-    if (filtros.value.categoria && p.categoria !== filtros.value.categoria) return false
-    if (filtros.value.prioridade && p.prioridade !== filtros.value.prioridade) return false
-    if (filtros.value.disponibilidade) {
-      const querReservado = filtros.value.disponibilidade === 'Reservado'
-      if (!!p.reservado !== querReservado) return false
-    }
-    if (busca && !semAcento(`${p.item} ${p.categoria} ${p.observacoes ?? ''}`).includes(busca)) {
-      return false
-    }
-    return true
-  })
-})
+/**
+ * Funcao solta, e nao so o corpo do computed, porque o painel de filtros usa a
+ * mesma regra para contar quantos presentes o rascunho deixaria — duas copias
+ * da regra dariam dois numeros diferentes na mesma tela.
+ */
+function combina(presente, f) {
+  if (f.categoria && presente.categoria !== f.categoria) return false
+  if (f.prioridade && presente.prioridade !== f.prioridade) return false
+  if (f.disponibilidade && !!presente.reservado !== (f.disponibilidade === 'Reservado')) {
+    return false
+  }
+  const busca = semAcento(f.busca.trim())
+  if (
+    busca &&
+    !semAcento(`${presente.item} ${presente.categoria} ${presente.observacoes ?? ''}`).includes(
+      busca,
+    )
+  ) {
+    return false
+  }
+  return true
+}
+
+const filtrados = computed(() => presentes.value.filter((p) => combina(p, filtros.value)))
+
+const contarComFiltro = (f) => presentes.value.filter((p) => combina(p, f)).length
 
 /** Já chega ordenado do composable; aqui só agrupa mantendo a ordem. */
 const grupos = computed(() => {
@@ -124,10 +182,22 @@ function abrirReserva(presente) {
   escolhido.value = presente
   erroReserva.value = ''
   sucesso.value = false
+  modoEntrega.value = false
 }
 
 function fecharReserva() {
   escolhido.value = null
+  modoEntrega.value = false
+}
+
+/**
+ * Presente ja reservado nao tem mais botao — e quem reservou pode ter fechado o
+ * modal sem anotar a chave. Abre o MESMO modal em modo consulta: sem formulario,
+ * mas com o link da loja, que e o que diz de quanto fazer o pix.
+ */
+function verComoEntregar(presente) {
+  escolhido.value = presente
+  modoEntrega.value = true
 }
 
 async function confirmarReserva({ nome, telefone }) {
@@ -138,10 +208,74 @@ async function confirmarReserva({ nome, telefone }) {
     sucesso.value = true
     // Só depois de dar certo: tentativa que falhou não é dado confirmado.
     salvarConvidado(nome, telefone)
+    // Quem acabou de reservar já está identificado — o selo vira "sua reserva"
+    // no mesmo frame, sem esperar o ciclo de 5s nem perguntar o telefone.
+    registrarLocal(escolhido.value.id, nome, telefone)
   } catch (e) {
     erroReserva.value = e.message
   } finally {
     salvando.value = false
+  }
+}
+
+// ---------------------------------------------------------------- identidade
+
+function abrirIdentificacao() {
+  perguntaAutomatica.value = false
+  mostrarIdentificar.value = true
+}
+
+/**
+ * Fechar sem responder. Quando foi a tela que abriu a pergunta, isso conta como
+ * "agora não" e a pergunta não volta: reabrir a cada carregamento seria cobrança,
+ * e o botão da lista continua ali para quem mudar de ideia.
+ */
+function fecharIdentificacao() {
+  if (perguntaAutomatica.value) dispensar()
+  mostrarIdentificar.value = false
+}
+
+function dispensarIdentificacao() {
+  dispensar()
+  mostrarIdentificar.value = false
+}
+
+/**
+ * Fecha sempre. Zero reserva é o caso comum e falha de rede não é problema de
+ * quem só quis dizer o celular — o número fica guardado nos dois casos e o ciclo
+ * de 5s traz as reservas quando conseguir.
+ */
+async function confirmarIdentificacao(telefone) {
+  await identificar(telefone)
+  mostrarIdentificar.value = false
+}
+
+function naoSouEu() {
+  esquecer()
+  // `esquecer` limpa também a dispensa: o próximo a pegar o celular merece a
+  // pergunta de volta. Abrir agora poupa dele um recarregamento.
+  abrirIdentificacao()
+}
+
+// ------------------------------------------------------------------ desfazer
+
+function pedirDesfazer(presente) {
+  erroDesfazer.value = ''
+  paraDesfazer.value = presente
+}
+
+async function confirmarDesfazer() {
+  desfazendo.value = true
+  erroDesfazer.value = ''
+  try {
+    await cancelarMinha(paraDesfazer.value.id)
+    paraDesfazer.value = null
+    // O item precisa voltar a "Reservar" agora, não no próximo ciclo.
+    await fetchPresentes({ silencioso: true })
+  } catch (e) {
+    erroDesfazer.value = e.message
+  } finally {
+    desfazendo.value = false
   }
 }
 </script>
@@ -187,13 +321,17 @@ async function confirmarReserva({ nome, telefone }) {
           pra você dar uma olhada antes de escolher.
         </p>
 
-        <div v-if="!loading && total" class="surgir mt-9 flex items-end gap-5" style="--i: 3">
+        <div
+          v-if="!loading && total"
+          class="surgir mt-9 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5"
+          style="--i: 3"
+        >
           <p class="tnum shrink-0 text-sm text-ink-soft">
             <span class="text-lg font-semibold text-ink">{{ reservados }}</span>
             de {{ total }} já reservados
           </p>
           <div
-            class="mb-1.5 h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"
+            class="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2 sm:mb-1.5"
             role="progressbar"
             :aria-valuenow="Math.round(progresso * 100)"
             aria-valuemin="0"
@@ -218,11 +356,35 @@ async function confirmarReserva({ nome, telefone }) {
       </div>
 
       <template v-else>
-        <ItemFilters v-model="filtros" :grupos="GRUPOS" />
+        <ItemFilters v-model="filtros" :grupos="GRUPOS" :contar="contarComFiltro" />
 
-        <p class="tnum mt-4 text-sm text-ink-faint">
-          {{ filtrados.length }} de {{ total }} presentes
-        </p>
+        <div class="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p class="tnum text-sm text-ink-faint">
+            {{ filtrados.length }} de {{ total }} presentes
+          </p>
+
+          <!-- O caminho de volta. Sem ele, "ainda não reservei" (e o X da
+               pergunta) viravam beco sem saída até limpar o navegador. -->
+          <p v-if="identificado" class="text-sm text-ink-faint">
+            <span class="tnum">{{ formatTelefone(meuTelefone) }}</span>
+            <span v-if="quantas"> · {{ quantas }} {{ quantas === 1 ? 'reserva sua' : 'reservas suas' }}</span>
+            <button
+              type="button"
+              class="ml-2 min-h-9 underline underline-offset-4 transition-colors hover:text-ink"
+              @click="naoSouEu"
+            >
+              não é você?
+            </button>
+          </p>
+          <button
+            v-else
+            type="button"
+            class="min-h-9 text-sm text-ink-faint underline underline-offset-4 transition-colors hover:text-ink"
+            @click="abrirIdentificacao"
+          >
+            já reservei algo?
+          </button>
+        </div>
 
         <div v-if="grupos.length" class="mt-8 space-y-12">
           <section
@@ -249,7 +411,10 @@ async function confirmarReserva({ nome, telefone }) {
                 v-for="p in grupo.itens"
                 :key="p.id"
                 :presente="p"
+                :minha-reserva="minhas.get(p.id) ?? null"
                 @reservar="abrirReserva"
+                @como-entregar="verComoEntregar"
+                @desfazer="pedirDesfazer"
               />
             </ul>
           </section>
@@ -281,7 +446,14 @@ async function confirmarReserva({ nome, telefone }) {
         </div>
       </template>
 
-      <footer class="mt-20 border-t border-line-soft pt-8 text-center text-sm text-ink-faint">
+      <!-- Fora do v-else de proposito: quem chega so pra mandar o pix nao
+           deveria depender do estado da lista nem dos filtros. -->
+      <ComoEntregar
+        id="como-entregar"
+        class="mt-20 max-w-[52ch] scroll-mt-24 border-t border-line-soft pt-8"
+      />
+
+      <footer class="mt-16 border-t border-line-soft pt-8 text-center text-sm text-ink-faint">
         <p>Obrigado por fazer parte da nossa casa.</p>
       </footer>
     </main>
@@ -293,8 +465,26 @@ async function confirmarReserva({ nome, telefone }) {
       :erro="erroReserva"
       :sucesso="sucesso"
       :indisponivel="indisponivel"
+      :somente-entrega="modoEntrega"
       @fechar="fecharReserva"
       @reservar="confirmarReserva"
+    />
+
+    <IdentificarModal
+      v-if="mostrarIdentificar"
+      :carregando="identificando"
+      @identificar="confirmarIdentificacao"
+      @dispensar="dispensarIdentificacao"
+      @fechar="fecharIdentificacao"
+    />
+
+    <DesfazerReserva
+      v-if="paraDesfazer"
+      :presente="paraDesfazer"
+      :cancelando="desfazendo"
+      :erro="erroDesfazer"
+      @fechar="paraDesfazer = null"
+      @confirmar="confirmarDesfazer"
     />
   </div>
 </template>

@@ -54,3 +54,20 @@ export const PRIORIDADE_COR = {
   Importante: 'var(--p-importante)',
   Desejável: 'var(--p-desejavel)',
 }
+
+/**
+ * O que cada marca quer dizer, em uma linha.
+ *
+ * A marca e cor + forma e vive em toda linha da lista, mas ate aqui ninguem
+ * dizia o que ela significava — o convidado via tres bolinhas diferentes e
+ * ficava adivinhando qual pesava mais. A legenda embaixo da busca resolve isso
+ * no lugar onde a duvida nasce.
+ *
+ * Frases curtas de proposito: elas ficam lado a lado numa linha so no desktop e
+ * quebram em tres no celular. Texto longo aqui vira paragrafo antes da lista.
+ */
+export const PRIORIDADE_DESCRICAO = {
+  Essencial: 'a casa não roda sem',
+  Importante: 'faz falta no dia a dia',
+  Desejável: 'pode esperar',
+}

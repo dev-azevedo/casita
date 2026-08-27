@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { Check, Pencil, Trash2, X } from '@lucide/vue'
+import { Check, Pencil, Trash2, UserPlus, X } from '@lucide/vue'
 import { formatBRL, formatData, formatTelefone, linkWhatsApp } from '@/lib/format'
 import Casinha from './Casinha.vue'
 import MarcaPrioridade from './MarcaPrioridade.vue'
@@ -9,7 +9,7 @@ const props = defineProps({
   item: { type: Object, required: true },
 })
 
-const emit = defineEmits(['toggle', 'edit', 'remove', 'cancelar-reserva'])
+const emit = defineEmits(['toggle', 'edit', 'remove', 'reservar', 'cancelar-reserva'])
 
 /** Vem do embed em useItems. Array por causa do PostgREST, mas é no máximo um. */
 const reserva = computed(() => props.item.reservas?.[0] ?? null)
@@ -181,6 +181,18 @@ function confirmarCompra() {
         <!-- Sempre presentes: esconder até o hover deixaria o app sem editar no
              celular, que é onde ele vai ser usado. No mouse, ganham contraste. -->
         <div class="flex shrink-0 gap-0.5">
+          <!-- Porta de entrada da caixa de reserva acima. Só enquanto não há
+               dono: com reserva, a ação que sobra é cancelar, e ela mora lá. -->
+          <button
+            v-if="!reserva"
+            type="button"
+            :aria-label="`Reservar ${item.item} para um convidado`"
+            title="Reservar para um convidado"
+            class="grid size-11 place-items-center rounded-full text-ink-faint transition-colors hover:bg-accent-soft hover:text-accent-ink"
+            @click="emit('reservar', item)"
+          >
+            <UserPlus :size="17" :stroke-width="1.8" />
+          </button>
           <button
             type="button"
             aria-label="Editar item"
