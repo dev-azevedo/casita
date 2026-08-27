@@ -5,17 +5,14 @@ import { X } from '@lucide/vue'
 /**
  * O convite em tela cheia.
  *
- * A arte e monocromatica (public/fotos/convite.svg: 446 paths num unico fill
- * preto), entao ela entra como MASCARA de um bloco colorido, nao como <img>:
- * assim a tinta acompanha a cor da casa sem tocar no arquivo e sem carregar
- * 88 KB de SVG para dentro do bundle.
+ * A arte e uma imagem pronta (public/fotos/convite.jpg), com as cores que ela ja
+ * traz: o convite NAO acompanha a cor da casa. Entra como <img> com
+ * object-contain, entao a proporcao 1136x1600 se preserva em qualquer tela.
  *
  * O convite e papel, e papel nao tem tema: o fundo fica branco no claro e no
- * escuro. Por isso esta tela nao usa --surface-0 nem --accent-ink, que viram
- * outra coisa em [data-theme='escuro'] — ela repete a rampa CLARA na mao. Sem
- * isso, o tema escuro daria fundo cinza-chumbo e uma tinta 86% de clareza, que
- * some no branco. O par --h/--c continua vindo do documento, entao trocar a cor
- * da casa no painel ainda retinge o convite.
+ * escuro. Por isso esta tela nao usa --surface-0, que vira outra coisa em
+ * [data-theme='escuro'] — ela repete a rampa CLARA na mao. Sem isso, o tema
+ * escuro daria um fundo cinza-chumbo em volta da arte.
  */
 const emit = defineEmits(['fechar'])
 
@@ -48,10 +45,10 @@ onBeforeUnmount(() => {
     style="animation: aparecer 320ms var(--ease-expo)"
     @click.self="emit('fechar')"
   >
-    <div
-      class="convite-arte h-full w-full max-w-[min(100%,44rem)]"
-      role="img"
-      aria-label="Convite do nosso chá de casa nova"
+    <img
+      src="/fotos/convite.jpg"
+      alt="Convite do nosso chá de casa nova"
+      class="h-full w-full max-w-[min(100%,44rem)] object-contain"
     />
 
     <!-- Alvo de toque cheio e fundo proprio: sobre a arte, um X solto sumiria.
@@ -77,15 +74,6 @@ onBeforeUnmount(() => {
    o resto do app usa — branco puro nao existe em lugar nenhum desta paleta. */
 .convite-papel {
   background: oklch(98.5% 0.008 var(--h));
-}
-
-/* `contain` ja resolve a proporcao: a mascara encolhe ate caber no bloco sem
-   distorcer e fica centrada, entao o bloco pode ocupar a tela toda. A cor vem do
-   background — e o --accent-ink do tema claro, escrito na mao. */
-.convite-arte {
-  background-color: oklch(40% calc(var(--c) * 0.5) var(--h));
-  -webkit-mask: url('/fotos/convite.svg') center / contain no-repeat;
-  mask: url('/fotos/convite.svg') center / contain no-repeat;
 }
 
 .convite-fechar {
